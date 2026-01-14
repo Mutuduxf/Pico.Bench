@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+        
+        <!-- Package metadata -->
+        <PackageId>Pico.Bench</PackageId>
+        <Version>1.0.0</Version>
+        <Authors>Pico</Authors>
+        <Description>A lightweight, zero-dependency benchmarking library for .NET. Supports Console, CSV, and Markdown output formats.</Description>
+        <PackageTags>benchmark;performance;testing</PackageTags>
+        
+        <!-- AOT compatibility -->
+        <IsAotCompatible>true</IsAotCompatible>
+    </PropertyGroup>
+
+</Project>

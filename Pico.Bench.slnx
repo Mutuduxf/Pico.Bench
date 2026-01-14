@@ -4,6 +4,7 @@
   </Folder>
   <Folder Name="/src/">
     <File Path="src\README.md" />
+    <Project Path="src/Pico.Bench/Pico.Bench.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <File Path="tests\README.md" />
