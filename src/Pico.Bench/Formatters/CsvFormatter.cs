@@ -376,7 +376,7 @@ public sealed class CsvFormatter : FormatterBase
         if (File.Exists(filePath))
         {
             // Skip header line if file already exists
-            var lines = content.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+            var lines = content.Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries);
             if (lines.Length > 1)
             {
                 File.AppendAllLines(filePath, lines.Skip(1));

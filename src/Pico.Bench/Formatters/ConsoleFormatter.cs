@@ -323,7 +323,7 @@ public sealed class ConsoleFormatter : FormatterBase
     private static string CenterText(string text, int width)
     {
         if (text.Length >= width)
-            return text[..width];
+            return text.Substring(0, width);
 
         var padding = (width - text.Length) / 2;
         return text.PadLeft(padding + text.Length).PadRight(width);

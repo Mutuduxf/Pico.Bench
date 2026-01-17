@@ -3,7 +3,7 @@ namespace Pico.Bench;
 /// <summary>
 /// Configuration for benchmark execution.
 /// </summary>
-public sealed record BenchmarkConfig
+public sealed class BenchmarkConfig
 {
     /// <summary>Number of warmup iterations before measurement.</summary>
     public int WarmupIterations { get; init; } = 1000;
@@ -18,11 +18,11 @@ public sealed record BenchmarkConfig
     public bool RetainSamples { get; init; } = false;
 
     /// <summary>Default configuration suitable for most benchmarks.</summary>
-    public static BenchmarkConfig Default { get; } = new();
+    public static BenchmarkConfig Default { get; } = new BenchmarkConfig();
 
     /// <summary>Quick configuration for faster iteration during development.</summary>
     public static BenchmarkConfig Quick { get; } =
-        new()
+        new BenchmarkConfig()
         {
             WarmupIterations = 100,
             SampleCount = 10,
@@ -31,7 +31,7 @@ public sealed record BenchmarkConfig
 
     /// <summary>Precise configuration for final measurements.</summary>
     public static BenchmarkConfig Precise { get; } =
-        new()
+        new BenchmarkConfig()
         {
             WarmupIterations = 5000,
             SampleCount = 200,
@@ -115,7 +115,6 @@ public static class Benchmark
         Action<TState>? warmup = null,
         BenchmarkConfig? config = null
     )
-        where TState : allows ref struct
     {
         config ??= BenchmarkConfig.Default;
 
@@ -281,7 +280,7 @@ public static class Benchmark
             P95 = GetPercentile(sorted, 95),
             P99 = GetPercentile(sorted, 99),
             Min = sorted[0],
-            Max = sorted[^1],
+            Max = sorted[sorted.Length - 1],
             StdDev = stdDev,
             CpuCyclesPerOp = perOpCycles.Average(),
             GcInfo = new GcInfo { Gen0 = gen0, Gen1 = gen1, Gen2 = gen2 }
@@ -291,7 +290,10 @@ public static class Benchmark
     private static double GetPercentile(double[] sortedData, int percentile)
     {
         var index = (int)Math.Ceiling(percentile / 100.0 * sortedData.Length) - 1;
-        return sortedData[Math.Clamp(index, 0, sortedData.Length - 1)];
+        // Manual clamping for netstandard2.0 compatibility
+        if (index < 0) index = 0;
+        if (index >= sortedData.Length) index = sortedData.Length - 1;
+        return sortedData[index];
     }
 
     #endregion

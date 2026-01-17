@@ -41,7 +41,7 @@ public sealed class TimingSample
     public ulong CpuCycles { get; init; }
 
     /// <summary>GC collection counts during this sample.</summary>
-    public required GcInfo GcInfo { get; init; }
+    public GcInfo GcInfo { get; init; }
 }
 
 /// <summary>
@@ -77,7 +77,7 @@ public sealed class Statistics
     public double CpuCyclesPerOp { get; init; }
 
     /// <summary>Aggregated GC info across all samples.</summary>
-    public required GcInfo GcInfo { get; init; }
+    public GcInfo GcInfo { get; init; }
 }
 
 /// <summary>
@@ -86,7 +86,7 @@ public sealed class Statistics
 public sealed class BenchmarkResult
 {
     /// <summary>Name/identifier of the benchmark.</summary>
-    public required string Name { get; init; }
+    public string Name { get; init; }
 
     /// <summary>Optional category/group for organizing results.</summary>
     public string? Category { get; init; }
@@ -95,7 +95,7 @@ public sealed class BenchmarkResult
     public IReadOnlyDictionary<string, string>? Tags { get; init; }
 
     /// <summary>Statistical summary of the benchmark.</summary>
-    public required Statistics Statistics { get; init; }
+    public Statistics Statistics { get; init; }
 
     /// <summary>Raw timing samples (optional, for detailed analysis).</summary>
     public IReadOnlyList<TimingSample>? Samples { get; init; }
@@ -116,7 +116,7 @@ public sealed class BenchmarkResult
 public sealed class ComparisonResult
 {
     /// <summary>Name of the comparison.</summary>
-    public required string Name { get; init; }
+    public string Name { get; init; }
 
     /// <summary>Optional category/group for organizing results.</summary>
     public string? Category { get; init; }
@@ -125,10 +125,10 @@ public sealed class ComparisonResult
     public IReadOnlyDictionary<string, string>? Tags { get; init; }
 
     /// <summary>Baseline benchmark result.</summary>
-    public required BenchmarkResult Baseline { get; init; }
+    public BenchmarkResult Baseline { get; init; }
 
     /// <summary>Candidate benchmark result (the one being compared).</summary>
-    public required BenchmarkResult Candidate { get; init; }
+    public BenchmarkResult Candidate { get; init; }
 
     /// <summary>Speedup ratio (Baseline.Avg / Candidate.Avg). >1 means candidate is faster.</summary>
     public double Speedup => Baseline.Statistics.Avg / Candidate.Statistics.Avg;
@@ -146,16 +146,16 @@ public sealed class ComparisonResult
 public sealed class BenchmarkSuite
 {
     /// <summary>Name of the benchmark suite.</summary>
-    public required string Name { get; init; }
+    public string Name { get; init; }
 
     /// <summary>Optional description.</summary>
     public string? Description { get; init; }
 
     /// <summary>Environment information.</summary>
-    public required EnvironmentInfo Environment { get; init; }
+    public EnvironmentInfo Environment { get; init; }
 
     /// <summary>All benchmark results in this suite.</summary>
-    public required IReadOnlyList<BenchmarkResult> Results { get; init; }
+    public IReadOnlyList<BenchmarkResult> Results { get; init; }
 
     /// <summary>All comparison results in this suite.</summary>
     public IReadOnlyList<ComparisonResult>? Comparisons { get; init; }
@@ -185,7 +185,7 @@ public sealed class EnvironmentInfo
     public int ProcessorCount { get; init; } = Environment.ProcessorCount;
 
     /// <summary>Whether running with Native AOT.</summary>
-    public bool IsNativeAot { get; init; } = !RuntimeFeature.IsDynamicCodeCompiled;
+    public bool IsNativeAot { get; init; } = false; // Native AOT detection not available in netstandard2.0
 
     /// <summary>Build configuration (Debug/Release).</summary>
     public string Configuration { get; init; } =

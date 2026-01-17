@@ -4,10 +4,16 @@ namespace Pico.Bench;
 /// Low-level timing utilities for benchmark measurements.
 /// Provides high-precision timing with GC and CPU cycle tracking.
 /// </summary>
-public static class Runner
+public static partial class Runner
 {
     private static bool _initialized;
     private static int _linuxPerfFd = -1;
+
+    static Runner()
+    {
+        AppDomain.CurrentDomain.ProcessExit += (sender, args) => CleanupLinuxPerf();
+        AppDomain.CurrentDomain.DomainUnload += (sender, args) => CleanupLinuxPerf();
+    }
 
     /// <summary>
     /// Initialize the runner by setting process/thread priority and warming up timing APIs.
@@ -30,7 +36,7 @@ public static class Runner
         }
 
         // Initialize Linux perf event for CPU cycle counting
-        if (OperatingSystem.IsLinux())
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
         {
             InitializeLinuxPerf();
         }
@@ -65,13 +71,15 @@ public static class Runner
         Action? teardown
     )
     {
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(iterations);
-        ArgumentNullException.ThrowIfNull(action);
+        if (iterations <= 0)
+            throw new ArgumentOutOfRangeException(nameof(iterations), "Iterations must be positive.");
+        if (action == null)
+            throw new ArgumentNullException(nameof(action));
 
         // Force GC and record baseline counts
-        GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, blocking: true);
+        GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced);
         GC.WaitForPendingFinalizers();
-        GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, blocking: true);
+        GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced);
 
         var gcCounts = new int[GC.MaxGeneration + 1];
         for (int i = 0; i <= GC.MaxGeneration; i++)
@@ -118,14 +126,15 @@ public static class Runner
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static TimingSample Time<TState>(int iterations, TState state, Action<TState> action)
-        where TState : allows ref struct
     {
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(iterations);
-        ArgumentNullException.ThrowIfNull(action);
+        if (iterations <= 0)
+            throw new ArgumentOutOfRangeException(nameof(iterations), "Iterations must be positive.");
+        if (action == null)
+            throw new ArgumentNullException(nameof(action));
 
-        GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, blocking: true);
+        GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced);
         GC.WaitForPendingFinalizers();
-        GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, blocking: true);
+        GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced);
 
         var gcCounts = new int[GC.MaxGeneration + 1];
         for (int i = 0; i <= GC.MaxGeneration; i++)
@@ -161,14 +170,14 @@ public static class Runner
 
     private static ulong GetCpuCycles()
     {
-        if (OperatingSystem.IsWindows())
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
             ulong cycleCount = 0;
             QueryThreadCycleTime(GetCurrentThread(), ref cycleCount);
             return cycleCount;
         }
 
-        if (OperatingSystem.IsLinux() && _linuxPerfFd >= 0)
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) && _linuxPerfFd >= 0)
         {
             return ReadLinuxPerfCounter();
         }
@@ -232,10 +241,26 @@ public static class Runner
     );
 
     [DllImport("libc", EntryPoint = "read", SetLastError = true)]
-    private static extern nint LinuxRead(int fd, out ulong buf, nint count);
+    private static extern IntPtr LinuxRead(int fd, out ulong buf, IntPtr count);
 
     [DllImport("libc", EntryPoint = "close", SetLastError = true)]
     private static extern int LinuxClose(int fd);
+
+    private static void CleanupLinuxPerf()
+    {
+        if (_linuxPerfFd >= 0)
+        {
+            try
+            {
+                LinuxClose(_linuxPerfFd);
+                _linuxPerfFd = -1;
+            }
+            catch
+            {
+                // Ignore errors during cleanup
+            }
+        }
+    }
 
     private static void InitializeLinuxPerf()
     {
@@ -273,8 +298,8 @@ public static class Runner
 
         try
         {
-            var bytesRead = LinuxRead(_linuxPerfFd, out var value, sizeof(ulong));
-            return bytesRead == sizeof(ulong) ? value : 0;
+            var bytesRead = LinuxRead(_linuxPerfFd, out var value, (IntPtr)sizeof(ulong));
+            return bytesRead == (IntPtr)sizeof(ulong) ? value : 0;
         }
         catch
         {
