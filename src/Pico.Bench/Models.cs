@@ -86,28 +86,57 @@ public sealed class Statistics
 public sealed class BenchmarkResult
 {
     /// <summary>Name/identifier of the benchmark.</summary>
-    public string Name { get; init; }
+    public string Name { get; }
 
     /// <summary>Optional category/group for organizing results.</summary>
-    public string? Category { get; init; }
+    public string? Category { get; }
 
     /// <summary>Optional tags for filtering and grouping.</summary>
-    public IReadOnlyDictionary<string, string>? Tags { get; init; }
+    public IReadOnlyDictionary<string, string>? Tags { get; }
 
     /// <summary>Statistical summary of the benchmark.</summary>
-    public Statistics Statistics { get; init; }
+    public Statistics Statistics { get; }
 
     /// <summary>Raw timing samples (optional, for detailed analysis).</summary>
-    public IReadOnlyList<TimingSample>? Samples { get; init; }
+    public IReadOnlyList<TimingSample>? Samples { get; }
 
     /// <summary>Number of iterations per sample.</summary>
-    public int IterationsPerSample { get; init; }
+    public int IterationsPerSample { get; }
 
     /// <summary>Total number of samples collected.</summary>
-    public int SampleCount { get; init; }
+    public int SampleCount { get; }
 
     /// <summary>When the benchmark was run.</summary>
-    public DateTime Timestamp { get; init; } = DateTime.UtcNow;
+    public DateTime Timestamp { get; } = DateTime.UtcNow;
+
+    public BenchmarkResult(
+        string name,
+        Statistics statistics,
+        int iterationsPerSample,
+        int sampleCount,
+        string? category = null,
+        IReadOnlyDictionary<string, string>? tags = null,
+        IReadOnlyList<TimingSample>? samples = null,
+        DateTime? timestamp = null)
+    {
+        Name = name ?? throw new ArgumentNullException(nameof(name));
+        Statistics = statistics ?? throw new ArgumentNullException(nameof(statistics));
+        
+        if (iterationsPerSample <= 0)
+            throw new ArgumentOutOfRangeException(nameof(iterationsPerSample), "IterationsPerSample must be positive.");
+        IterationsPerSample = iterationsPerSample;
+        
+        if (sampleCount <= 0)
+            throw new ArgumentOutOfRangeException(nameof(sampleCount), "SampleCount must be positive.");
+        SampleCount = sampleCount;
+        
+        Category = category;
+        Tags = tags;
+        Samples = samples;
+        
+        if (timestamp.HasValue)
+            Timestamp = timestamp.Value;
+    }
 }
 
 /// <summary>
@@ -116,19 +145,19 @@ public sealed class BenchmarkResult
 public sealed class ComparisonResult
 {
     /// <summary>Name of the comparison.</summary>
-    public string Name { get; init; }
+    public string Name { get; }
 
     /// <summary>Optional category/group for organizing results.</summary>
-    public string? Category { get; init; }
+    public string? Category { get; }
 
     /// <summary>Optional tags for filtering and grouping.</summary>
-    public IReadOnlyDictionary<string, string>? Tags { get; init; }
+    public IReadOnlyDictionary<string, string>? Tags { get; }
 
     /// <summary>Baseline benchmark result.</summary>
-    public BenchmarkResult Baseline { get; init; }
+    public BenchmarkResult Baseline { get; }
 
     /// <summary>Candidate benchmark result (the one being compared).</summary>
-    public BenchmarkResult Candidate { get; init; }
+    public BenchmarkResult Candidate { get; }
 
     /// <summary>Speedup ratio (Baseline.Avg / Candidate.Avg). >1 means candidate is faster.</summary>
     public double Speedup => Baseline.Statistics.Avg / Candidate.Statistics.Avg;
@@ -138,6 +167,20 @@ public sealed class ComparisonResult
 
     /// <summary>Percentage improvement. Positive means candidate is faster.</summary>
     public double ImprovementPercent => (Speedup - 1) * 100;
+
+    public ComparisonResult(
+        string name,
+        BenchmarkResult baseline,
+        BenchmarkResult candidate,
+        string? category = null,
+        IReadOnlyDictionary<string, string>? tags = null)
+    {
+        Name = name ?? throw new ArgumentNullException(nameof(name));
+        Baseline = baseline ?? throw new ArgumentNullException(nameof(baseline));
+        Candidate = candidate ?? throw new ArgumentNullException(nameof(candidate));
+        Category = category;
+        Tags = tags;
+    }
 }
 
 /// <summary>

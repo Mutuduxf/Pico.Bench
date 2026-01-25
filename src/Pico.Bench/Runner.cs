@@ -81,7 +81,7 @@ public static partial class Runner
         GC.WaitForPendingFinalizers();
         GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced);
 
-        var gcCounts = new int[GC.MaxGeneration + 1];
+        var gcCounts = new long[GC.MaxGeneration + 1];
         for (int i = 0; i <= GC.MaxGeneration; i++)
             gcCounts[i] = GC.CollectionCount(i);
 
@@ -107,9 +107,9 @@ public static partial class Runner
         var elapsedTicks = watch.ElapsedTicks;
         var elapsedNs = elapsedTicks * (1_000_000_000.0 / Stopwatch.Frequency);
 
-        var gen0 = GC.CollectionCount(0) - gcCounts[0];
-        var gen1 = GC.MaxGeneration >= 1 ? GC.CollectionCount(1) - gcCounts[1] : 0;
-        var gen2 = GC.MaxGeneration >= 2 ? GC.CollectionCount(2) - gcCounts[2] : 0;
+        var gen0 = (int)(GC.CollectionCount(0) - gcCounts[0]);
+        var gen1 = GC.MaxGeneration >= 1 ? (int)(GC.CollectionCount(1) - gcCounts[1]) : 0;
+        var gen2 = GC.MaxGeneration >= 2 ? (int)(GC.CollectionCount(2) - gcCounts[2]) : 0;
 
         return new TimingSample
         {
@@ -136,7 +136,7 @@ public static partial class Runner
         GC.WaitForPendingFinalizers();
         GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced);
 
-        var gcCounts = new int[GC.MaxGeneration + 1];
+        var gcCounts = new long[GC.MaxGeneration + 1];
         for (int i = 0; i <= GC.MaxGeneration; i++)
             gcCounts[i] = GC.CollectionCount(i);
 
@@ -152,9 +152,9 @@ public static partial class Runner
         var elapsedTicks = watch.ElapsedTicks;
         var elapsedNs = elapsedTicks * (1_000_000_000.0 / Stopwatch.Frequency);
 
-        var gen0 = GC.CollectionCount(0) - gcCounts[0];
-        var gen1 = GC.MaxGeneration >= 1 ? GC.CollectionCount(1) - gcCounts[1] : 0;
-        var gen2 = GC.MaxGeneration >= 2 ? GC.CollectionCount(2) - gcCounts[2] : 0;
+        var gen0 = (int)(GC.CollectionCount(0) - gcCounts[0]);
+        var gen1 = GC.MaxGeneration >= 1 ? (int)(GC.CollectionCount(1) - gcCounts[1]) : 0;
+        var gen2 = GC.MaxGeneration >= 2 ? (int)(GC.CollectionCount(2) - gcCounts[2]) : 0;
 
         return new TimingSample
         {
@@ -182,7 +182,12 @@ public static partial class Runner
             return ReadLinuxPerfCounter();
         }
 
-        // macOS and other platforms: not supported yet
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+        {
+            return GetMacOsCpuCycles();
+        }
+
+        // Other platforms: not supported yet
         return 0;
     }
 
@@ -253,11 +258,14 @@ public static partial class Runner
             try
             {
                 LinuxClose(_linuxPerfFd);
-                _linuxPerfFd = -1;
             }
             catch
             {
                 // Ignore errors during cleanup
+            }
+            finally
+            {
+                _linuxPerfFd = -1;
             }
         }
     }
@@ -266,6 +274,19 @@ public static partial class Runner
     {
         try
         {
+            // Check perf_event_paranoid value first
+            if (File.Exists("/proc/sys/kernel/perf_event_paranoid"))
+            {
+                var paranoidValue = File.ReadAllText("/proc/sys/kernel/perf_event_paranoid").Trim();
+                if (int.TryParse(paranoidValue, out var value) && value > 1)
+                {
+                    // perf_event_paranoid > 1 requires CAP_SYS_ADMIN or root
+                    // CPU cycle counting will not be available
+                    _linuxPerfFd = -1;
+                    return;
+                }
+            }
+
             var attr = new PerfEventAttr
             {
                 Type = PERF_TYPE_HARDWARE,
@@ -279,14 +300,18 @@ public static partial class Runner
 
             if (_linuxPerfFd < 0)
             {
-                // perf_event_open failed, likely due to permissions
-                // Try reading /proc/sys/kernel/perf_event_paranoid
-                // Value > 1 requires CAP_SYS_ADMIN or root
+                // perf_event_open failed due to permissions or other reasons
                 _linuxPerfFd = -1;
             }
         }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or IOException or DllNotFoundException)
+        {
+            // Expected exceptions: permission denied, file not found, libc not available
+            _linuxPerfFd = -1;
+        }
         catch
         {
+            // Catch any other unexpected exceptions
             _linuxPerfFd = -1;
         }
     }
@@ -299,7 +324,48 @@ public static partial class Runner
         try
         {
             var bytesRead = LinuxRead(_linuxPerfFd, out var value, (IntPtr)sizeof(ulong));
-            return bytesRead == (IntPtr)sizeof(ulong) ? value : 0;
+            if (bytesRead == (IntPtr)sizeof(ulong))
+                return value;
+            
+            // Read failed, disable perf counter for future calls
+            CleanupLinuxPerf();
+            return 0;
+        }
+        catch (Exception ex) when (ex is IOException or ObjectDisposedException)
+        {
+            // File descriptor closed or IO error, disable perf counter
+            CleanupLinuxPerf();
+            return 0;
+        }
+        catch
+        {
+            // Any other error
+            return 0;
+        }
+    }
+
+    #endregion
+
+    #region macOS
+
+    [DllImport("/usr/lib/libSystem.dylib")]
+    private static extern ulong mach_absolute_time();
+
+    [DllImport("/usr/lib/libSystem.dylib")]
+    private static extern int mach_timebase_info(out MachTimebaseInfo info);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MachTimebaseInfo
+    {
+        public uint Numer;
+        public uint Denom;
+    }
+
+    private static ulong GetMacOsCpuCycles()
+    {
+        try
+        {
+            return mach_absolute_time();
         }
         catch
         {

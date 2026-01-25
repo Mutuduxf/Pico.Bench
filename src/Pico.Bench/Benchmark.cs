@@ -5,14 +5,30 @@ namespace Pico.Bench;
 /// </summary>
 public sealed class BenchmarkConfig
 {
+    private int _warmupIterations = 1000;
+    private int _sampleCount = 100;
+    private int _iterationsPerSample = 10000;
+
     /// <summary>Number of warmup iterations before measurement.</summary>
-    public int WarmupIterations { get; init; } = 1000;
+    public int WarmupIterations
+    {
+        get => _warmupIterations;
+        init => _warmupIterations = value >= 0 ? value : throw new ArgumentOutOfRangeException(nameof(WarmupIterations), "WarmupIterations must be non-negative.");
+    }
 
     /// <summary>Number of samples to collect.</summary>
-    public int SampleCount { get; init; } = 100;
+    public int SampleCount
+    {
+        get => _sampleCount;
+        init => _sampleCount = value > 0 ? value : throw new ArgumentOutOfRangeException(nameof(SampleCount), "SampleCount must be positive.");
+    }
 
     /// <summary>Number of iterations per sample.</summary>
-    public int IterationsPerSample { get; init; } = 10000;
+    public int IterationsPerSample
+    {
+        get => _iterationsPerSample;
+        init => _iterationsPerSample = value > 0 ? value : throw new ArgumentOutOfRangeException(nameof(IterationsPerSample), "IterationsPerSample must be positive.");
+    }
 
     /// <summary>Whether to retain raw samples in the result.</summary>
     public bool RetainSamples { get; init; } = false;
@@ -92,14 +108,13 @@ public static class Benchmark
         // Compute statistics
         var stats = ComputeStatistics(perOpTimes, perOpCycles, samples);
 
-        return new BenchmarkResult
-        {
-            Name = name,
-            Statistics = stats,
-            IterationsPerSample = config.IterationsPerSample,
-            SampleCount = config.SampleCount,
-            Samples = config.RetainSamples ? samples : null
-        };
+        return new BenchmarkResult(
+            name: name,
+            statistics: stats,
+            iterationsPerSample: config.IterationsPerSample,
+            sampleCount: config.SampleCount,
+            samples: config.RetainSamples ? samples : null
+        );
     }
 
     /// <summary>
@@ -144,14 +159,13 @@ public static class Benchmark
 
         var stats = ComputeStatistics(perOpTimes, perOpCycles, samples);
 
-        return new BenchmarkResult
-        {
-            Name = name,
-            Statistics = stats,
-            IterationsPerSample = config.IterationsPerSample,
-            SampleCount = config.SampleCount,
-            Samples = config.RetainSamples ? samples : null
-        };
+        return new BenchmarkResult(
+            name: name,
+            statistics: stats,
+            iterationsPerSample: config.IterationsPerSample,
+            sampleCount: config.SampleCount,
+            samples: config.RetainSamples ? samples : null
+        );
     }
 
     /// <summary>
@@ -194,14 +208,13 @@ public static class Benchmark
 
         var stats = ComputeStatistics(perOpTimes, perOpCycles, samples);
 
-        return new BenchmarkResult
-        {
-            Name = name,
-            Statistics = stats,
-            IterationsPerSample = config.IterationsPerSample,
-            SampleCount = config.SampleCount,
-            Samples = config.RetainSamples ? samples : null
-        };
+        return new BenchmarkResult(
+            name: name,
+            statistics: stats,
+            iterationsPerSample: config.IterationsPerSample,
+            sampleCount: config.SampleCount,
+            samples: config.RetainSamples ? samples : null
+        );
     }
 
     /// <summary>
@@ -213,12 +226,11 @@ public static class Benchmark
         BenchmarkResult candidate
     )
     {
-        return new ComparisonResult
-        {
-            Name = name,
-            Baseline = baseline,
-            Candidate = candidate
-        };
+        return new ComparisonResult(
+            name: name,
+            baseline: baseline,
+            candidate: candidate
+        );
     }
 
     /// <summary>
@@ -236,12 +248,11 @@ public static class Benchmark
         var baseline = Run(baselineName, baselineAction, config);
         var candidate = Run(candidateName, candidateAction, config);
 
-        return new ComparisonResult
-        {
-            Name = name,
-            Baseline = baseline,
-            Candidate = candidate
-        };
+        return new ComparisonResult(
+            name: name,
+            baseline: baseline,
+            candidate: candidate
+        );
     }
 
     #region Statistics Computation
@@ -267,8 +278,20 @@ public static class Benchmark
             gen2 += sample.GcInfo.Gen2;
         }
 
+        // Use more numerically stable variance calculation
         var avg = perOpTimes.Average();
-        var variance = perOpTimes.Select(t => (t - avg) * (t - avg)).Average();
+        var variance = 0.0;
+        if (perOpTimes.Length > 1)
+        {
+            // Welford's online algorithm for variance
+            var m2 = 0.0;
+            for (int i = 0; i < perOpTimes.Length; i++)
+            {
+                var delta = perOpTimes[i] - avg;
+                m2 += delta * delta;
+            }
+            variance = m2 / perOpTimes.Length;
+        }
         var stdDev = Math.Sqrt(variance);
 
         return new Statistics

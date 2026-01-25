@@ -60,21 +60,19 @@ foreach (var count in appendCounts)
     allResults.AddRange([stringResult, sbResult, sbCapacityResult]);
 
     // Create comparisons
-    var comparison1 = new ComparisonResult
-    {
-        Name = $"String vs StringBuilder ({count})",
-        Category = $"{count} appends",
-        Baseline = stringResult,
-        Candidate = sbResult
-    };
+    var comparison1 = new ComparisonResult(
+        name: $"String vs StringBuilder ({count})",
+        baseline: stringResult,
+        candidate: sbResult,
+        category: $"{count} appends"
+    );
 
-    var comparison2 = new ComparisonResult
-    {
-        Name = $"String vs StringBuilder+Capacity ({count})",
-        Category = $"{count} appends",
-        Baseline = stringResult,
-        Candidate = sbCapacityResult
-    };
+    var comparison2 = new ComparisonResult(
+        name: $"String vs StringBuilder+Capacity ({count})",
+        baseline: stringResult,
+        candidate: sbCapacityResult,
+        category: $"{count} appends"
+    );
 
     allComparisons.AddRange([comparison1, comparison2]);
 }
@@ -110,13 +108,12 @@ var sbJoinResult = Benchmark.Run(
 
 allResults.AddRange([joinResult, sbJoinResult]);
 
-var joinComparison = new ComparisonResult
-{
-    Name = "String.Join vs StringBuilder",
-    Category = "Array Join",
-    Baseline = sbJoinResult,
-    Candidate = joinResult
-};
+var joinComparison = new ComparisonResult(
+    name: "String.Join vs StringBuilder",
+    baseline: sbJoinResult,
+    candidate: joinResult,
+    category: "Array Join"
+);
 allComparisons.Add(joinComparison);
 
 // Create suite
