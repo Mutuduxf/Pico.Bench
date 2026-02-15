@@ -110,12 +110,13 @@ public abstract class FormatterBase(FormatterOptions? options = null) : IFormatt
 
     protected string FormatTime(double nanoseconds)
     {
-        return nanoseconds.ToString($"F{Options.TimeDecimalPlaces}");
+        return nanoseconds.ToString($"F{Options.TimeDecimalPlaces}", CultureInfo.InvariantCulture);
     }
 
     protected string FormatSpeedup(double speedup)
     {
-        return speedup.ToString($"F{Options.SpeedupDecimalPlaces}") + "x";
+        return speedup.ToString($"F{Options.SpeedupDecimalPlaces}", CultureInfo.InvariantCulture)
+            + "x";
     }
 
     protected static string FormatGcInfo(GcInfo gc)

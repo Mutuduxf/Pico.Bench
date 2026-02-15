@@ -6,8 +6,8 @@ namespace Pico.Bench;
 /// </summary>
 public static partial class Runner
 {
-    private static bool _initialized;
-    private static int _linuxPerfFd = -1;
+    private static int _initialized;
+    private static volatile int _linuxPerfFd = -1;
 
     static Runner()
     {
@@ -21,7 +21,8 @@ public static partial class Runner
     /// </summary>
     public static void Initialize()
     {
-        if (_initialized)
+        // Use Interlocked.CompareExchange for thread-safe initialization
+        if (System.Threading.Interlocked.CompareExchange(ref _initialized, 1, 0) != 0)
             return;
 
         try
@@ -43,7 +44,6 @@ public static partial class Runner
 
         // Warm-up: touch Stopwatch/GC/cycle APIs once.
         Time(1, static () => { });
-        _initialized = true;
     }
 
     /// <summary>
@@ -64,15 +64,13 @@ public static partial class Runner
     /// <param name="setup">Optional setup action (not timed).</param>
     /// <param name="teardown">Optional teardown action (not timed).</param>
     /// <returns>A <see cref="TimingSample"/> containing timing and GC data.</returns>
-    public static TimingSample Time(
-        int iterations,
-        Action action,
-        Action? setup,
-        Action? teardown
-    )
+    public static TimingSample Time(int iterations, Action action, Action? setup, Action? teardown)
     {
         if (iterations <= 0)
-            throw new ArgumentOutOfRangeException(nameof(iterations), "Iterations must be positive.");
+            throw new ArgumentOutOfRangeException(
+                nameof(iterations),
+                "Iterations must be positive."
+            );
         if (action == null)
             throw new ArgumentNullException(nameof(action));
 
@@ -117,7 +115,10 @@ public static partial class Runner
     public static TimingSample Time<TState>(int iterations, TState state, Action<TState> action)
     {
         if (iterations <= 0)
-            throw new ArgumentOutOfRangeException(nameof(iterations), "Iterations must be positive.");
+            throw new ArgumentOutOfRangeException(
+                nameof(iterations),
+                "Iterations must be positive."
+            );
         if (action == null)
             throw new ArgumentNullException(nameof(action));
 
@@ -157,17 +158,42 @@ public static partial class Runner
         var gcCounts = new long[GC.MaxGeneration + 1];
         for (int i = 0; i <= GC.MaxGeneration; i++)
             gcCounts[i] = GC.CollectionCount(i);
-        
+
         return gcCounts;
     }
 
     private static GcInfo CalculateGcDelta(long[] baselineCounts)
     {
-        var gen0 = (int)(GC.CollectionCount(0) - baselineCounts[0]);
-        var gen1 = GC.MaxGeneration >= 1 ? (int)(GC.CollectionCount(1) - baselineCounts[1]) : 0;
-        var gen2 = GC.MaxGeneration >= 2 ? (int)(GC.CollectionCount(2) - baselineCounts[2]) : 0;
-        
-        return new GcInfo { Gen0 = gen0, Gen1 = gen1, Gen2 = gen2 };
+        // Helper to compute GC count delta with handling of 32-bit wraparound
+        static int ComputeDelta(int current, long baseline)
+        {
+            // Treat both as unsigned 32-bit integers to handle wraparound
+            var currentU = unchecked((uint)current);
+            var baselineU = unchecked((uint)baseline);
+            var deltaU = currentU - baselineU; // Underflow is fine, gives correct difference modulo 2^32
+            return unchecked((int)deltaU); // Convert back to signed int (negative values possible but unlikely for typical benchmarks)
+        }
+
+        var gen0 = ComputeDelta(GC.CollectionCount(0), baselineCounts[0]);
+        var gen1 =
+            GC.MaxGeneration >= 1 ? ComputeDelta(GC.CollectionCount(1), baselineCounts[1]) : 0;
+        var gen2 =
+            GC.MaxGeneration >= 2 ? ComputeDelta(GC.CollectionCount(2), baselineCounts[2]) : 0;
+
+        // Ensure non-negative (should be, but guard against extreme cases)
+        if (gen0 < 0)
+            gen0 = 0;
+        if (gen1 < 0)
+            gen1 = 0;
+        if (gen2 < 0)
+            gen2 = 0;
+
+        return new GcInfo
+        {
+            Gen0 = gen0,
+            Gen1 = gen1,
+            Gen2 = gen2
+        };
     }
 
     #endregion
@@ -179,8 +205,9 @@ public static partial class Runner
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
             ulong cycleCount = 0;
-            QueryThreadCycleTime(GetCurrentThread(), ref cycleCount);
-            return cycleCount;
+            if (QueryThreadCycleTime(GetCurrentThread(), ref cycleCount))
+                return cycleCount;
+            return 0;
         }
 
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) && _linuxPerfFd >= 0)
@@ -213,7 +240,20 @@ public static partial class Runner
     // perf_event_open constants
     private const int PERF_TYPE_HARDWARE = 0;
     private const int PERF_COUNT_HW_CPU_CYCLES = 0;
-    private const int SYSCALL_PERF_EVENT_OPEN = 298; // x86_64
+
+    // System call numbers for perf_event_open across architectures
+    private static int GetPerfEventOpenSyscallNumber()
+    {
+        var architecture = RuntimeInformation.ProcessArchitecture;
+        return architecture switch
+        {
+            Architecture.X64 => 298, // x86_64
+            Architecture.X86 => 336, // x86 (32-bit)
+            Architecture.Arm64 => 241, // ARM64
+            Architecture.Arm => 364, // ARM (32-bit)
+            _ => -1 // Unknown architecture
+        };
+    }
 
     [StructLayout(LayoutKind.Sequential)]
     private struct PerfEventAttr
@@ -252,7 +292,7 @@ public static partial class Runner
     );
 
     [DllImport("libc", EntryPoint = "read", SetLastError = true)]
-    private static extern IntPtr LinuxRead(int fd, out ulong buf, IntPtr count);
+    private static extern unsafe IntPtr LinuxRead(int fd, byte* buf, IntPtr count);
 
     [DllImport("libc", EntryPoint = "close", SetLastError = true)]
     private static extern int LinuxClose(int fd);
@@ -302,7 +342,13 @@ public static partial class Runner
             };
 
             // pid=0 means current process, cpu=-1 means any CPU
-            _linuxPerfFd = SyscallPerfEventOpen(SYSCALL_PERF_EVENT_OPEN, ref attr, 0, -1, -1, 0);
+            var syscallNumber = GetPerfEventOpenSyscallNumber();
+            if (syscallNumber < 0)
+            {
+                _linuxPerfFd = -1;
+                return;
+            }
+            _linuxPerfFd = SyscallPerfEventOpen(syscallNumber, ref attr, 0, -1, -1, 0);
 
             if (_linuxPerfFd < 0)
             {
@@ -310,7 +356,8 @@ public static partial class Runner
                 _linuxPerfFd = -1;
             }
         }
-        catch (Exception ex) when (ex is UnauthorizedAccessException or IOException or DllNotFoundException)
+        catch (Exception ex)
+            when (ex is UnauthorizedAccessException or IOException or DllNotFoundException)
         {
             // Expected exceptions: permission denied, file not found, libc not available
             _linuxPerfFd = -1;
@@ -322,17 +369,26 @@ public static partial class Runner
         }
     }
 
-    private static ulong ReadLinuxPerfCounter()
+    private static unsafe ulong ReadLinuxPerfCounter()
     {
         if (_linuxPerfFd < 0)
             return 0;
 
         try
         {
-            var bytesRead = LinuxRead(_linuxPerfFd, out var value, (IntPtr)sizeof(ulong));
+            byte* buffer = stackalloc byte[sizeof(ulong)];
+            var bytesRead = LinuxRead(_linuxPerfFd, buffer, (IntPtr)sizeof(ulong));
             if (bytesRead == (IntPtr)sizeof(ulong))
+            {
+                // Convert bytes to ulong (assuming little-endian)
+                ulong value = 0;
+                for (var i = 0; i < sizeof(ulong); i++)
+                {
+                    value |= ((ulong)buffer[i]) << (i * 8);
+                }
                 return value;
-            
+            }
+
             // Read failed, disable perf counter for future calls
             CleanupLinuxPerf();
             return 0;
@@ -367,6 +423,11 @@ public static partial class Runner
         public uint Denom;
     }
 
+    /// <summary>
+    /// Returns mach absolute time on macOS (not CPU cycles).
+    /// This provides high-resolution timing but not cycle-accurate measurements.
+    /// For CPU cycle counting on macOS, use platform-specific APIs.
+    /// </summary>
     private static ulong GetMacOsCpuCycles()
     {
         try

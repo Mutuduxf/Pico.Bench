@@ -9,6 +9,10 @@ public sealed class BenchmarkConfig
     private int _sampleCount = 100;
     private int _iterationsPerSample = 10000;
 
+    private static BenchmarkConfig? _default;
+    private static BenchmarkConfig? _quick;
+    private static BenchmarkConfig? _precise;
+
     /// <summary>Number of warmup iterations before measurement.</summary>
     public int WarmupIterations
     {
@@ -55,23 +59,21 @@ public sealed class BenchmarkConfig
     public bool RetainSamples { get; init; } = false;
 
     /// <summary>Default configuration suitable for most benchmarks.</summary>
-    public static BenchmarkConfig Default { get; } = new();
+    public static BenchmarkConfig Default => _default ??= new();
 
     /// <summary>Quick configuration for faster iteration during development.</summary>
-    public static BenchmarkConfig Quick { get; } =
-        new()
-        {
-            WarmupIterations = 100,
-            SampleCount = 10,
-            IterationsPerSample = 1000
-        };
+    public static BenchmarkConfig Quick => _quick ??= new()
+    {
+        WarmupIterations = 100,
+        SampleCount = 10,
+        IterationsPerSample = 1000
+    };
 
     /// <summary>Precise configuration for final measurements.</summary>
-    public static BenchmarkConfig Precise { get; } =
-        new()
-        {
-            WarmupIterations = 5000,
-            SampleCount = 200,
-            IterationsPerSample = 50000
-        };
+    public static BenchmarkConfig Precise => _precise ??= new()
+    {
+        WarmupIterations = 5000,
+        SampleCount = 200,
+        IterationsPerSample = 50000
+    };
 }

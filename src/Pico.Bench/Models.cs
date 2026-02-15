@@ -167,7 +167,24 @@ public sealed class ComparisonResult
     public BenchmarkResult Candidate { get; }
 
     /// <summary>Speedup ratio (Baseline.Avg / Candidate.Avg). >1 means candidate is faster.</summary>
-    public double Speedup => Baseline.Statistics.Avg / Candidate.Statistics.Avg;
+    public double Speedup
+    {
+        get
+        {
+            var candidateAvg = Candidate.Statistics.Avg;
+            var baselineAvg = Baseline.Statistics.Avg;
+
+            // Handle near-zero candidate average
+            if (!(Math.Abs(candidateAvg) < 1e-12))
+                return baselineAvg / candidateAvg;
+            // If both are near-zero, treat as equal (speedup = 1)
+            return Math.Abs(baselineAvg) < 1e-12
+                ? 1.0
+                :
+                // Candidate is extremely fast (near-zero time)
+                double.PositiveInfinity;
+        }
+    }
 
     /// <summary>Returns true if candidate is faster than baseline.</summary>
     public bool IsFaster => Speedup > 1.0;

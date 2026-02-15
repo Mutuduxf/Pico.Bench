@@ -51,18 +51,19 @@ internal static class StatisticsCalculator
         if (perOpTimes.Length > 1)
         {
             var m2 = 0.0;
-            for (int i = 0; i < perOpTimes.Length; i++)
+            foreach (var t in perOpTimes)
             {
-                var delta = perOpTimes[i] - avg;
+                var delta = t - avg;
+
                 m2 += delta * delta;
             }
-            variance = m2 / perOpTimes.Length;
+            variance = m2 / (perOpTimes.Length - 1);
         }
-        var stdDev = Math.Sqrt(variance);
+        var stdDev = Math.Sqrt(Math.Max(0, variance));
 
         // Calculate CPU cycles average
         var cpuCyclesSum = 0.0;
-        for (int i = 0; i < perOpCycles.Length; i++)
+        for (var i = 0; i < perOpCycles.Length; i++)
         {
             cpuCyclesSum += perOpCycles[i];
         }
@@ -90,12 +91,23 @@ internal static class StatisticsCalculator
 
     private static double GetPercentile(double[] sortedData, int percentile)
     {
-        var index = (int)Math.Ceiling(percentile / 100.0 * sortedData.Length) - 1;
-        // Manual clamping for netstandard2.0 compatibility
-        if (index < 0)
-            index = 0;
-        if (index >= sortedData.Length)
-            index = sortedData.Length - 1;
-        return sortedData[index];
+        switch (sortedData.Length)
+        {
+            case 0:
+                return 0;
+            case 1:
+                return sortedData[0];
+        }
+
+        // Standard linear interpolation method
+        var position = (percentile / 100.0) * (sortedData.Length - 1);
+        var lower = (int)Math.Floor(position);
+        var upper = lower + 1;
+
+        if (upper >= sortedData.Length)
+            return sortedData[lower];
+
+        var weight = position - lower;
+        return sortedData[lower] * (1 - weight) + sortedData[upper] * weight;
     }
 }
