@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <EnableCodeCoverage>true</EnableCodeCoverage>
+    <IncludeSource>true</IncludeSource>
+    <TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Main project reference -->
+    <ProjectReference Include="..\src\Pico.Bench\Pico.Bench.csproj" />
+    
+    <!-- TUnit testing framework -->
+    <PackageReference Include="TUnit" Version="*" />
+    
+    <!-- File system helpers for test cleanup -->
+    <PackageReference Include="System.IO.Abstractions" Version="*" PrivateAssets="All" />
+  </ItemGroup>
+</Project>

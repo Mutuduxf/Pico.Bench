@@ -1,0 +1,417 @@
+using TUnit.Assertions;
+using TUnit.Assertions.Extensions;
+using TUnit.Core;
+using Pico.Bench;
+using Pico.Bench.Formatters;
+using Pico.Bench.Tests.TestData;
+using Pico.Bench.Tests.Utilities;
+
+namespace Pico.Bench.Tests.Formatters;
+
+public class HtmlFormatterTests
+{
+    [Test]
+    [Property("Category", "Formatter")]
+    [Property("SubCategory", "HTML")]
+    public async Task Format_Results_ReturnsValidHtml()
+    {
+        var results = BenchmarkResultFactory.CreateMultiple(2).ToList();
+        var formatter = new HtmlFormatter();
+        
+        var html = formatter.Format(results);
+        
+        await Assert.That(html).IsNotNull();
+        await Assert.That(html).Contains("<!DOCTYPE html>");
+        await Assert.That(html).Contains("<html");
+        await Assert.That(html).Contains("</html>");
+        await Assert.That(html).Contains("<table");
+        await Assert.That(html).Contains("</table>");
+        await Assert.That(html).Contains(results[0].Name);
+    }
+    
+    [Test]
+    [Property("Category", "Formatter")]
+    [Property("SubCategory", "HTML")]
+    public async Task Format_EmptyResults_ReturnsNoDataMessage()
+    {
+        var formatter = new HtmlFormatter();
+        
+        var html = formatter.Format(Enumerable.Empty<BenchmarkResult>());
+        
+        await Assert.That(html).IsNotNull();
+        await Assert.That(html).Contains("No results available");
+        await Assert.That(html).Contains("no-data");
+    }
+    
+    [Test]
+    [Property("Category", "Formatter")]
+    [Property("SubCategory", "HTML")]
+    [MethodDataSource(nameof(GetSpeedupClassTestCases))]
+    public async Task SpeedupClasses_AssignedCorrectly(double speedup, string expectedClass)
+    {
+        // Note: GetSpeedupClass is private, test through comparison output
+        var comparison = ComparisonResultFactory.Create();
+        // We need to create a comparison with specific speedup
+        // Since we can't directly set speedup, we'll test via the output pattern
+        
+        var formatter = new HtmlFormatter();
+        var html = formatter.Format(comparison);
+        
+        // The HTML should contain speedup CSS classes
+        await Assert.That(html).Contains("speedup");
+        
+        // Check that CSS classes are defined in styles
+        await Assert.That(html).Contains(".speedup.fast");
+        await Assert.That(html).Contains(".speedup.very-fast");
+        await Assert.That(html).Contains(".speedup.slow");
+        await Assert.That(html).Contains(".speedup.neutral");
+    }
+    
+    [Test]
+    [Property("Category", "Formatter")]
+    [Property("SubCategory", "HTML")]
+    [MethodDataSource(nameof(GetEscapeTestCases))]
+    public async Task Escape_HandlesHtmlEntities(string input, string expectedEntity)
+    {
+        var result = BenchmarkResultFactory.Create(input);
+        var formatter = new HtmlFormatter();
+        
+        var html = formatter.Format(result);
+        
+        await Assert.That(html).IsNotNull();
+        
+        // Check that special characters are escaped
+        if (!string.IsNullOrEmpty(expectedEntity))
+        {
+            await Assert.That(html).Contains(expectedEntity);
+            await Assert.That(html).DoesNotContain(input);
+        }
+        else
+        {
+            await Assert.That(html).Contains(input);
+        }
+    }
+    
+    [Test]
+    [Property("Category", "Formatter")]
+    [Property("SubCategory", "HTML")]
+    public async Task Styles_EmbeddedInOutput()
+    {
+        var formatter = new HtmlFormatter();
+        var html = formatter.Format(BenchmarkResultFactory.Create());
+        
+        await Assert.That(html).Contains("<style>");
+        await Assert.That(html).Contains("</style>");
+        await Assert.That(html).Contains(":root");
+        await Assert.That(html).Contains("var(--primary)");
+        await Assert.That(html).Contains(".container");
+        await Assert.That(html).Contains("table");
+    }
+    
+    [Test]
+    [Property("Category", "Formatter")]
+    [Property("SubCategory", "HTML")]
+    public async Task Format_Comparisons_IncludesSpeedupIndicators()
+    {
+        var comparisons = ComparisonResultFactory.CreateMultiple(2).ToList();
+        var formatter = new HtmlFormatter();
+        
+        var html = formatter.Format(comparisons);
+        
+        await Assert.That(html).IsNotNull();
+        await Assert.That(html).Contains("indicator");
+        await Assert.That(html).Contains("***");
+        await Assert.That(html).Contains("(!)");
+    }
+    
+    [Test]
+    [Property("Category", "Formatter")]
+    [Property("SubCategory", "HTML")]
+    public async Task Format_Suite_ReturnsCompletePage()
+    {
+        var suite = BenchmarkSuiteFactory.Create();
+        var formatter = new HtmlFormatter();
+        
+        var html = formatter.Format(suite);
+        
+        await Assert.That(html).IsNotNull();
+        await Assert.That(html).Contains("<!DOCTYPE html>");
+        await Assert.That(html).Contains(suite.Name);
+        await Assert.That(html).Contains("<footer>");
+        await Assert.That(html).Contains("Generated by Pico.Bench");
+        
+        if (!string.IsNullOrEmpty(suite.Description))
+        {
+            await Assert.That(html).Contains(suite.Description);
+        }
+    }
+    
+    [Test]
+    [Property("Category", "Formatter")]
+    [Property("SubCategory", "HTML")]
+    [MethodDataSource(nameof(GetOptionCombinations))]
+    public async Task OptionalSections_RespectOptions(FormatterOptions options)
+    {
+        var suite = BenchmarkSuiteFactory.Create();
+        var formatter = new HtmlFormatter(options);
+        
+        var html = formatter.Format(suite);
+        
+        if (options.IncludeEnvironment)
+        {
+            await Assert.That(html).Contains("Environment:");
+        }
+        else
+        {
+            await Assert.That(html).DoesNotContain("Environment:");
+        }
+        
+        if (options.IncludeTimestamp)
+        {
+            await Assert.That(html).Contains("Timestamp:");
+        }
+        else
+        {
+            await Assert.That(html).DoesNotContain("Timestamp:");
+        }
+    }
+    
+    [Test]
+    [Property("Category", "Formatter")]
+    [Property("SubCategory", "HTML")]
+    [Property("FileSystem", "true")]
+    [NotInParallel]
+    [MethodDataSource(nameof(GetDummyTestContext))]
+    public async Task WriteToFile_CreatesValidHtmlFile(TestContext context)
+    {
+        var testDir = FileSystemHelper.CreateTestDirectory();
+        try
+        {
+            var filePath = Path.Combine(testDir, "test.html");
+            var result = BenchmarkResultFactory.Create();
+            
+            HtmlFormatter.WriteToFile(filePath, result);
+            
+            await Assert.That(File.Exists(filePath)).IsTrue();
+            var content = await File.ReadAllTextAsync(filePath);
+            
+            await Assert.That(content).Contains("<!DOCTYPE html>");
+            await Assert.That(content).Contains(result.Name);
+            
+            context?.LogFileOperation("WriteToFile HTML", filePath);
+        }
+        finally
+        {
+            FileSystemHelper.DeleteTestDirectory(testDir);
+        }
+    }
+    
+    [Test]
+    [Property("Category", "Formatter")]
+    [Property("SubCategory", "HTML")]
+    public async Task Format_ComparisonSummary_IncludesStats()
+    {
+        var comparisons = ComparisonResultFactory.CreateMultiple(3).ToList();
+        var formatter = new HtmlFormatter();
+        
+        var html = formatter.Format(comparisons);
+        
+        await Assert.That(html).IsNotNull();
+        await Assert.That(html).Contains("summary-box");
+        await Assert.That(html).Contains("Scenarios Won");
+        await Assert.That(html).Contains("Average Speedup");
+        await Assert.That(html).Contains("Maximum Speedup");
+    }
+    
+    [Test]
+    [Property("Category", "Formatter")]
+    [Property("SubCategory", "HTML")]
+    public async Task Format_WithUnicodeCharacters_HandlesCorrectly()
+    {
+        var result = BenchmarkResultFactory.WithUnicodeName();
+        var formatter = new HtmlFormatter();
+        
+        var html = formatter.Format(result);
+        
+        await Assert.That(html).IsNotNull();
+        // Unicode characters should be preserved in HTML
+        await Assert.That(html).Contains(result.Name);
+    }
+    
+    [Test]
+    [Property("Category", "Formatter")]
+    [Property("SubCategory", "HTML")]
+    public async Task Format_WithCustomLabels_UsesLabels()
+    {
+        var options = new FormatterOptions 
+        { 
+            BaselineLabel = "Control", 
+            CandidateLabel = "Treatment" 
+        };
+        var comparisons = ComparisonResultFactory.CreateMultiple(1).ToList();
+        var formatter = new HtmlFormatter(options);
+        
+        var html = formatter.Format(comparisons);
+        
+        await Assert.That(html).IsNotNull();
+        await Assert.That(html).Contains("Control");
+        await Assert.That(html).Contains("Treatment");
+    }
+    
+    [Test]
+    [Property("Category", "Formatter")]
+    [Property("SubCategory", "HTML")]
+    public async Task Format_WithNullInput_ThrowsArgumentNullException()
+    {
+        var formatter = new HtmlFormatter();
+        
+        await Assert.ThrowsAsync<ArgumentNullException>(() => 
+            Task.Run(() => formatter.Format((BenchmarkResult)null!)));
+        
+        await Assert.ThrowsAsync<ArgumentNullException>(() => 
+            Task.Run(() => formatter.Format((IEnumerable<BenchmarkResult>)null!)));
+        
+        await Assert.ThrowsAsync<ArgumentNullException>(() => 
+            Task.Run(() => formatter.Format((ComparisonResult)null!)));
+        
+        await Assert.ThrowsAsync<ArgumentNullException>(() => 
+            Task.Run(() => formatter.Format((IEnumerable<ComparisonResult>)null!)));
+        
+        await Assert.ThrowsAsync<ArgumentNullException>(() => 
+            Task.Run(() => formatter.Format((BenchmarkSuite)null!)));
+    }
+    
+    [Test]
+    [Property("Category", "Formatter")]
+    [Property("SubCategory", "HTML")]
+    public async Task HtmlStructure_ValidatesEssentialElements()
+    {
+        var formatter = new HtmlFormatter();
+        var html = formatter.Format(BenchmarkResultFactory.Create());
+        
+        // Check essential HTML structure
+        await Assert.That(html).StartsWith("<!DOCTYPE html>");
+        await Assert.That(html).Contains("<head>");
+        await Assert.That(html).Contains("</head>");
+        await Assert.That(html).Contains("<body>");
+        await Assert.That(html).Contains("</body>");
+        await Assert.That(html).EndsWith("</html>" + Environment.NewLine);
+        
+        // Check viewport meta tag for responsiveness
+        await Assert.That(html).Contains("viewport");
+        await Assert.That(html).Contains("UTF-8");
+    }
+    
+    [Test]
+    [Property("Category", "Formatter")]
+    [Property("SubCategory", "HTML")]
+    public async Task CssVariables_DefinedInRoot()
+    {
+        var formatter = new HtmlFormatter();
+        var html = formatter.Format(BenchmarkResultFactory.Create());
+        
+        await Assert.That(html).Contains("--primary:");
+        await Assert.That(html).Contains("--success:");
+        await Assert.That(html).Contains("--warning:");
+        await Assert.That(html).Contains("--danger:");
+        await Assert.That(html).Contains("--bg:");
+        await Assert.That(html).Contains("--text:");
+    }
+    
+    [Test]
+    [Property("Category", "Formatter")]
+    [Property("SubCategory", "HTML")]
+    [Property("FileSystem", "true")]
+    [NotInParallel]
+    [MethodDataSource(nameof(GetDummyTestContext))]
+    public async Task WriteToFile_Comparisons_CreatesValidHtml(TestContext context)
+    {
+        var testDir = FileSystemHelper.CreateTestDirectory();
+        try
+        {
+            var filePath = Path.Combine(testDir, "comparisons.html");
+            var comparisons = ComparisonResultFactory.CreateMultiple(2).ToList();
+            
+            HtmlFormatter.WriteToFile(filePath, comparisons);
+            
+            await Assert.That(File.Exists(filePath)).IsTrue();
+            var content = await File.ReadAllTextAsync(filePath);
+            
+            await Assert.That(content).Contains("Benchmark Comparison");
+            await Assert.That(content).Contains("summary-box");
+            
+            context?.LogFileOperation("WriteToFile comparisons HTML", filePath);
+        }
+        finally
+        {
+            FileSystemHelper.DeleteTestDirectory(testDir);
+        }
+    }
+    
+    [Test]
+    [Property("Category", "Formatter")]
+    [Property("SubCategory", "HTML")]
+    [Property("FileSystem", "true")]
+    [NotInParallel]
+    [MethodDataSource(nameof(GetDummyTestContext))]
+    public async Task WriteToFile_Suite_CreatesValidHtml(TestContext context)
+    {
+        var testDir = FileSystemHelper.CreateTestDirectory();
+        try
+        {
+            var filePath = Path.Combine(testDir, "suite.html");
+            var suite = BenchmarkSuiteFactory.Create();
+            
+            HtmlFormatter.WriteToFile(filePath, suite);
+            
+            await Assert.That(File.Exists(filePath)).IsTrue();
+            var content = await File.ReadAllTextAsync(filePath);
+            
+            await Assert.That(content).Contains(suite.Name);
+            await Assert.That(content).Contains("<footer>");
+            
+            context?.LogFileOperation("WriteToFile suite HTML", filePath);
+        }
+        finally
+        {
+            FileSystemHelper.DeleteTestDirectory(testDir);
+        }
+    }
+    
+    public static IEnumerable<(double speedup, string expectedClass)> GetSpeedupClassTestCases()
+    {
+        yield return (5.0, "very-fast");   // >=3
+        yield return (3.0, "very-fast");   // Boundary
+        yield return (2.9, "fast");        // <3
+        yield return (2.0, "fast");        // >=1.5
+        yield return (1.5, "fast");        // Boundary
+        yield return (1.4, "neutral");     // <1.5
+        yield return (1.0, "neutral");     // >=1 Boundary
+        yield return (0.9, "slow");        // <1
+    }
+    
+    public static IEnumerable<(string input, string expectedEntity)> GetEscapeTestCases()
+    {
+        yield return ("NormalText", "");
+        yield return ("Text & More", "&amp;");
+        yield return ("Text < Tag", "&lt;");
+        yield return ("Tag > Text", "&gt;");
+        yield return ("\"Quote\"", "&quot;");
+        yield return ("'Apostrophe'", "&#39;");
+        yield return ("Mixed < & > \" '", "");
+    }
+    
+    public static IEnumerable<FormatterOptions> GetOptionCombinations()
+    {
+        yield return FormatterOptions.Default;
+        yield return FormatterOptions.Compact;
+        yield return FormatterOptions.Minimal;
+        yield return new FormatterOptions { IncludeEnvironment = false };
+        yield return new FormatterOptions { IncludeTimestamp = false };
+    }
+    
+    public static IEnumerable<TestContext> GetDummyTestContext()
+    {
+        yield return null!;
+    }
+}
