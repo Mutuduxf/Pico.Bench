@@ -14,6 +14,9 @@
     <!-- Main project reference -->
     <ProjectReference Include="..\src\Pico.Bench\Pico.Bench.csproj" />
     
+    <!-- Source generator project (as regular library, not analyzer) for testing internals -->
+    <ProjectReference Include="..\src\Pico.Bench.Generators\Pico.Bench.Generators.csproj" />
+    
     <!-- TUnit testing framework -->
     <PackageReference Include="TUnit" Version="*" />
     

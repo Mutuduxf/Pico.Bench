@@ -15,4 +15,12 @@
         <PackageTags>benchmark;performance;testing;cross-platform</PackageTags>
     </PropertyGroup>
 
+    <ItemGroup>
+        <!-- Bundle the source generator so consumers get it automatically -->
+        <ProjectReference Include="..\Pico.Bench.Generators\Pico.Bench.Generators.csproj"
+                          PrivateAssets="all"
+                          ReferenceOutputAssembly="false"
+                          OutputItemType="Analyzer" />
+    </ItemGroup>
+
 </Project>

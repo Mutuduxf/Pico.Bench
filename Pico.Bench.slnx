@@ -2,10 +2,13 @@
   <Folder Name="/samples/">
     <File Path="samples\README.md" />
     <Project Path="samples/StringVsStringBuilder/StringVsStringBuilder.csproj" />
+    <Project Path="samples/AttributeBased/AttributeBased.csproj" />
+    <Project Path="samples/CollectionBenchmarks/CollectionBenchmarks.csproj" />
   </Folder>
   <Folder Name="/src/">
     <File Path="src\README.md" />
     <Project Path="src/Pico.Bench/Pico.Bench.csproj" />
+    <Project Path="src/Pico.Bench.Generators/Pico.Bench.Generators.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <File Path="tests\README.md" />
