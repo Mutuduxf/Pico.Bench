@@ -7,6 +7,11 @@
         <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
         <IsRoslynComponent>true</IsRoslynComponent>
         <RootNamespace>Pico.Bench.Generators</RootNamespace>
+
+        <!-- This project is consumed as an analyzer, not a regular library -->
+        <IncludeBuildOutput>false</IncludeBuildOutput>
+        <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+        <DevelopmentDependency>true</DevelopmentDependency>
     </PropertyGroup>
 
     <ItemGroup>

@@ -6,13 +6,19 @@
         <Nullable>enable</Nullable>
         <LangVersion>latest</LangVersion>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    </PropertyGroup>
 
-        <!-- Package metadata -->
+    <!-- NuGet package metadata -->
+    <PropertyGroup>
         <PackageId>Pico.Bench</PackageId>
         <Version>1.0.0</Version>
-        <Authors>Pico</Authors>
-        <Description>A lightweight, zero-dependency, cross-platform benchmarking library for .NET. Supports Console, CSV, Markdown and HTML output formats. Works on Windows, Linux and macOS.</Description>
-        <PackageTags>benchmark;performance;testing;cross-platform</PackageTags>
+        <Authors>PicoHex</Authors>
+        <Description>A lightweight, zero-dependency, cross-platform benchmarking library for .NET with imperative and attribute-based APIs. Includes an AOT-compatible source generator. Supports Console, CSV, Markdown and HTML output formats.</Description>
+        <PackageTags>benchmark;performance;testing;cross-platform;aot;source-generator</PackageTags>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <RepositoryType>git</RepositoryType>
     </PropertyGroup>
 
     <ItemGroup>
@@ -21,6 +27,19 @@
                           PrivateAssets="all"
                           ReferenceOutputAssembly="false"
                           OutputItemType="Analyzer" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <!-- Include the source generator DLL in the analyzers folder of the NuGet package -->
+        <None Include="..\Pico.Bench.Generators\$(OutputPath)Pico.Bench.Generators.dll"
+              Pack="true"
+              PackagePath="analyzers/dotnet/cs"
+              Visible="false" />
+
+        <!-- Include the root README in the NuGet package -->
+        <None Include="..\..\README.md"
+              Pack="true"
+              PackagePath="\" />
     </ItemGroup>
 
 </Project>
