@@ -84,7 +84,7 @@ public static class SummaryFormatter
 
                 foreach (var c in group)
                 {
-                    var indicator = GetSpeedupIndicator(c.Speedup);
+                    var indicator = FormatterBase.GetSpeedupIndicator(c.Speedup);
                     sb.AppendLine($"   {c.Name, -35}: {c.Speedup:F2}x {indicator}");
                 }
                 sb.AppendLine();
@@ -189,18 +189,6 @@ public static class SummaryFormatter
         if (text.Length < innerWidth)
             sb.Append(' ', innerWidth - text.Length);
         sb.AppendLine("║");
-    }
-
-    private static string GetSpeedupIndicator(double speedup)
-    {
-        return speedup switch
-        {
-            >= 10 => "***",
-            >= 5 => "**",
-            >= 2 => "*",
-            >= 1 => "",
-            _ => "(!)"
-        };
     }
 
     #endregion

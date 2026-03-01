@@ -110,22 +110,30 @@ public abstract class FormatterBase(FormatterOptions? options = null) : IFormatt
 
     public string Format(BenchmarkResult result)
     {
-        return result == null ? throw new ArgumentNullException(nameof(result)) : FormatCore(result);
+        return result == null
+            ? throw new ArgumentNullException(nameof(result))
+            : FormatCore(result);
     }
 
     public string Format(IEnumerable<BenchmarkResult> results)
     {
-        return results == null ? throw new ArgumentNullException(nameof(results)) : FormatCore(results);
+        return results == null
+            ? throw new ArgumentNullException(nameof(results))
+            : FormatCore(results);
     }
 
     public string Format(ComparisonResult comparison)
     {
-        return comparison == null ? throw new ArgumentNullException(nameof(comparison)) : FormatCore(comparison);
+        return comparison == null
+            ? throw new ArgumentNullException(nameof(comparison))
+            : FormatCore(comparison);
     }
 
     public string Format(IEnumerable<ComparisonResult> comparisons)
     {
-        return comparisons == null ? throw new ArgumentNullException(nameof(comparisons)) : FormatCore(comparisons);
+        return comparisons == null
+            ? throw new ArgumentNullException(nameof(comparisons))
+            : FormatCore(comparisons);
     }
 
     public string Format(BenchmarkSuite suite)
@@ -135,11 +143,23 @@ public abstract class FormatterBase(FormatterOptions? options = null) : IFormatt
 
     #endregion
 
-    #region Protected abstract — override in derived classes
+    #region Protected abstract/virtual — override in derived classes
 
-    protected abstract string FormatCore(BenchmarkResult result);
+    /// <summary>
+    /// Format a single result. Default delegates to the collection overload.
+    /// Override for custom single-item formatting (e.g., <see cref="ConsoleFormatter"/>).
+    /// </summary>
+    protected virtual string FormatCore(BenchmarkResult result) => FormatCore(new[] { result });
+
     protected abstract string FormatCore(IEnumerable<BenchmarkResult> results);
-    protected abstract string FormatCore(ComparisonResult comparison);
+
+    /// <summary>
+    /// Format a single comparison. Default delegates to the collection overload.
+    /// Override for custom single-item formatting.
+    /// </summary>
+    protected virtual string FormatCore(ComparisonResult comparison) =>
+        FormatCore(new[] { comparison });
+
     protected abstract string FormatCore(IEnumerable<ComparisonResult> comparisons);
     protected abstract string FormatCore(BenchmarkSuite suite);
 
@@ -161,7 +181,10 @@ public abstract class FormatterBase(FormatterOptions? options = null) : IFormatt
         return $"{gc.Gen0}/{gc.Gen1}/{gc.Gen2}";
     }
 
-    protected static string GetSpeedupIndicator(double speedup)
+    /// <summary>
+    /// Get a visual indicator for the speedup magnitude.
+    /// </summary>
+    public static string GetSpeedupIndicator(double speedup)
     {
         return speedup switch
         {

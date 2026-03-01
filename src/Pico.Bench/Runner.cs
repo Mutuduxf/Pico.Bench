@@ -65,11 +65,7 @@ public static partial class Runner
     /// <returns>A <see cref="TimingSample"/> containing timing and GC data.</returns>
     public static TimingSample Time(int iterations, Action action, Action? setup, Action? teardown)
     {
-        if (iterations <= 0)
-            throw new ArgumentOutOfRangeException(
-                nameof(iterations),
-                "Iterations must be positive."
-            );
+        ValidateIterations(iterations);
         if (action == null)
             throw new ArgumentNullException(nameof(action));
 
@@ -93,18 +89,7 @@ public static partial class Runner
         // Run teardown (not timed)
         teardown?.Invoke();
 
-        // Compute deltas
-        var elapsedTicks = watch.ElapsedTicks;
-        var elapsedNs = elapsedTicks * (1_000_000_000.0 / Stopwatch.Frequency);
-
-        return new TimingSample
-        {
-            ElapsedNanoseconds = elapsedNs,
-            ElapsedMilliseconds = elapsedNs / 1_000_000.0,
-            ElapsedTicks = elapsedTicks,
-            CpuCycles = cycleEnd - cycleStart,
-            GcInfo = CalculateGcDelta(gcBaseline)
-        };
+        return CreateSample(watch, cycleStart, cycleEnd, gcBaseline);
     }
 
     /// <summary>
@@ -113,11 +98,7 @@ public static partial class Runner
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static TimingSample Time<TState>(int iterations, TState state, Action<TState> action)
     {
-        if (iterations <= 0)
-            throw new ArgumentOutOfRangeException(
-                nameof(iterations),
-                "Iterations must be positive."
-            );
+        ValidateIterations(iterations);
         if (action == null)
             throw new ArgumentNullException(nameof(action));
 
@@ -132,6 +113,31 @@ public static partial class Runner
         watch.Stop();
         var cycleEnd = GetCpuCycles();
 
+        return CreateSample(watch, cycleStart, cycleEnd, gcBaseline);
+    }
+
+    /// <summary>
+    /// Validate that the iterations parameter is positive.
+    /// </summary>
+    private static void ValidateIterations(int iterations)
+    {
+        if (iterations <= 0)
+            throw new ArgumentOutOfRangeException(
+                nameof(iterations),
+                "Iterations must be positive."
+            );
+    }
+
+    /// <summary>
+    /// Create a <see cref="TimingSample"/> from stopwatch and CPU cycle measurements.
+    /// </summary>
+    private static TimingSample CreateSample(
+        Stopwatch watch,
+        ulong cycleStart,
+        ulong cycleEnd,
+        long[] gcBaseline
+    )
+    {
         var elapsedTicks = watch.ElapsedTicks;
         var elapsedNs = elapsedTicks * (1_000_000_000.0 / Stopwatch.Frequency);
 

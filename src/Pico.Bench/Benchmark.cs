@@ -14,11 +14,7 @@ public static class Benchmark
     /// <returns>A <see cref="BenchmarkResult"/> containing statistics.</returns>
     public static BenchmarkResult Run(string name, Action action, BenchmarkConfig? config = null)
     {
-        if (string.IsNullOrWhiteSpace(name))
-            throw new ArgumentException(
-                "Benchmark name cannot be null or whitespace.",
-                nameof(name)
-            );
+        ValidateName(name, nameof(name));
         if (action == null)
             throw new ArgumentNullException(nameof(action));
 
@@ -44,17 +40,11 @@ public static class Benchmark
         Action? teardown = null
     )
     {
-        if (string.IsNullOrWhiteSpace(name))
-            throw new ArgumentException(
-                "Benchmark name cannot be null or whitespace.",
-                nameof(name)
-            );
+        ValidateName(name, nameof(name));
         if (action == null)
             throw new ArgumentNullException(nameof(action));
 
         config ??= BenchmarkConfig.Default;
-
-        // Initialize runner if not already done
         Runner.Initialize();
 
         // Warmup phase
@@ -64,34 +54,10 @@ public static class Benchmark
                 warmup();
         }
 
-        // Force a single GC before the collection phase to establish a clean baseline.
-        // Individual samples no longer force GC (moved out of Runner.Time for accuracy).
-        GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced);
-        GC.WaitForPendingFinalizers();
-        GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced);
-
-        // Collection phase
-        var samples = new TimingSample[config.SampleCount];
-        var perOpTimes = new double[config.SampleCount];
-        var perOpCycles = new double[config.SampleCount];
-
-        for (int s = 0; s < config.SampleCount; s++)
-        {
-            var sample = Runner.Time(config.IterationsPerSample, action, setup, teardown);
-            samples[s] = sample;
-            perOpTimes[s] = sample.ElapsedNanoseconds / config.IterationsPerSample;
-            perOpCycles[s] = (double)sample.CpuCycles / config.IterationsPerSample;
-        }
-
-        // Compute statistics
-        var stats = StatisticsCalculator.Compute(perOpTimes, perOpCycles, samples);
-
-        return new BenchmarkResult(
-            name: name,
-            statistics: stats,
-            iterationsPerSample: config.IterationsPerSample,
-            sampleCount: config.SampleCount,
-            samples: config.RetainSamples ? samples : null
+        return CollectAndBuild(
+            name,
+            config,
+            () => Runner.Time(config.IterationsPerSample, action, setup, teardown)
         );
     }
 
@@ -106,16 +72,11 @@ public static class Benchmark
         BenchmarkConfig? config = null
     )
     {
-        if (string.IsNullOrWhiteSpace(name))
-            throw new ArgumentException(
-                "Benchmark name cannot be null or whitespace.",
-                nameof(name)
-            );
+        ValidateName(name, nameof(name));
         if (action == null)
             throw new ArgumentNullException(nameof(action));
 
         config ??= BenchmarkConfig.Default;
-
         Runner.Initialize();
 
         // Warmup phase
@@ -130,32 +91,10 @@ public static class Benchmark
                 action(state);
         }
 
-        // Force a single GC before the collection phase to establish a clean baseline.
-        GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced);
-        GC.WaitForPendingFinalizers();
-        GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced);
-
-        // Collection phase
-        var samples = new TimingSample[config.SampleCount];
-        var perOpTimes = new double[config.SampleCount];
-        var perOpCycles = new double[config.SampleCount];
-
-        for (var s = 0; s < config.SampleCount; s++)
-        {
-            var sample = Runner.Time(config.IterationsPerSample, state, action);
-            samples[s] = sample;
-            perOpTimes[s] = sample.ElapsedNanoseconds / config.IterationsPerSample;
-            perOpCycles[s] = (double)sample.CpuCycles / config.IterationsPerSample;
-        }
-
-        var stats = StatisticsCalculator.Compute(perOpTimes, perOpCycles, samples);
-
-        return new BenchmarkResult(
-            name: name,
-            statistics: stats,
-            iterationsPerSample: config.IterationsPerSample,
-            sampleCount: config.SampleCount,
-            samples: config.RetainSamples ? samples : null
+        return CollectAndBuild(
+            name,
+            config,
+            () => Runner.Time(config.IterationsPerSample, state, action)
         );
     }
 
@@ -171,18 +110,13 @@ public static class Benchmark
     )
         where TScope : IDisposable
     {
-        if (string.IsNullOrWhiteSpace(name))
-            throw new ArgumentException(
-                "Benchmark name cannot be null or whitespace.",
-                nameof(name)
-            );
+        ValidateName(name, nameof(name));
         if (scopeFactory == null)
             throw new ArgumentNullException(nameof(scopeFactory));
         if (action == null)
             throw new ArgumentNullException(nameof(action));
 
         config ??= BenchmarkConfig.Default;
-
         Runner.Initialize();
 
         // Warmup phase - use a single scope
@@ -193,20 +127,95 @@ public static class Benchmark
                 action(warmupScope);
         }
 
-        // Force a single GC before the collection phase to establish a clean baseline.
+        return CollectAndBuild(
+            name,
+            config,
+            () =>
+            {
+                using var scope = scopeFactory();
+                return Runner.Time(config.IterationsPerSample, scope, action);
+            }
+        );
+    }
+
+    /// <summary>
+    /// Compare two benchmarks and return a comparison result.
+    /// </summary>
+    public static ComparisonResult Compare(
+        string name,
+        BenchmarkResult baseline,
+        BenchmarkResult candidate
+    )
+    {
+        ValidateName(name, nameof(name));
+        return new ComparisonResult(name: name, baseline: baseline, candidate: candidate);
+    }
+
+    /// <summary>
+    /// Compare two actions directly and return a comparison result.
+    /// </summary>
+    public static ComparisonResult Compare(
+        string name,
+        string baselineName,
+        Action baselineAction,
+        string candidateName,
+        Action candidateAction,
+        BenchmarkConfig? config = null
+    )
+    {
+        ValidateName(name, nameof(name));
+        ValidateName(baselineName, nameof(baselineName));
+        if (baselineAction == null)
+            throw new ArgumentNullException(nameof(baselineAction));
+        ValidateName(candidateName, nameof(candidateName));
+        if (candidateAction == null)
+            throw new ArgumentNullException(nameof(candidateAction));
+
+        var baseline = Run(baselineName, baselineAction, config);
+        var candidate = Run(candidateName, candidateAction, config);
+
+        return new ComparisonResult(name: name, baseline: baseline, candidate: candidate);
+    }
+
+    #region Private Helpers
+
+    /// <summary>
+    /// Validate that a name parameter is not null or whitespace.
+    /// </summary>
+    private static void ValidateName(string name, string paramName)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            throw new ArgumentException($"{paramName} cannot be null or whitespace.", paramName);
+    }
+
+    /// <summary>
+    /// Force a full GC to establish a clean baseline before the collection phase.
+    /// </summary>
+    private static void ForceGc()
+    {
         GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced);
         GC.WaitForPendingFinalizers();
         GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced);
+    }
 
-        // Collection phase - one scope per sample
+    /// <summary>
+    /// Run the collection phase, compute statistics, and build the result.
+    /// </summary>
+    private static BenchmarkResult CollectAndBuild(
+        string name,
+        BenchmarkConfig config,
+        Func<TimingSample> sampleFunc
+    )
+    {
+        ForceGc();
+
         var samples = new TimingSample[config.SampleCount];
         var perOpTimes = new double[config.SampleCount];
         var perOpCycles = new double[config.SampleCount];
 
-        for (int s = 0; s < config.SampleCount; s++)
+        for (var s = 0; s < config.SampleCount; s++)
         {
-            using var scope = scopeFactory();
-            var sample = Runner.Time(config.IterationsPerSample, scope, action);
+            var sample = sampleFunc();
             samples[s] = sample;
             perOpTimes[s] = sample.ElapsedNanoseconds / config.IterationsPerSample;
             perOpCycles[s] = (double)sample.CpuCycles / config.IterationsPerSample;
@@ -223,59 +232,5 @@ public static class Benchmark
         );
     }
 
-    /// <summary>
-    /// Compare two benchmarks and return a comparison result.
-    /// </summary>
-    public static ComparisonResult Compare(
-        string name,
-        BenchmarkResult baseline,
-        BenchmarkResult candidate
-    )
-    {
-        if (string.IsNullOrWhiteSpace(name))
-            throw new ArgumentException(
-                "Comparison name cannot be null or whitespace.",
-                nameof(name)
-            );
-
-        return new ComparisonResult(name: name, baseline: baseline, candidate: candidate);
-    }
-
-    /// <summary>
-    /// Compare two actions directly and return a comparison result.
-    /// </summary>
-    public static ComparisonResult Compare(
-        string name,
-        string baselineName,
-        Action baselineAction,
-        string candidateName,
-        Action candidateAction,
-        BenchmarkConfig? config = null
-    )
-    {
-        if (string.IsNullOrWhiteSpace(name))
-            throw new ArgumentException(
-                "Comparison name cannot be null or whitespace.",
-                nameof(name)
-            );
-        if (string.IsNullOrWhiteSpace(baselineName))
-            throw new ArgumentException(
-                "Baseline name cannot be null or whitespace.",
-                nameof(baselineName)
-            );
-        if (baselineAction == null)
-            throw new ArgumentNullException(nameof(baselineAction));
-        if (string.IsNullOrWhiteSpace(candidateName))
-            throw new ArgumentException(
-                "Candidate name cannot be null or whitespace.",
-                nameof(candidateName)
-            );
-        if (candidateAction == null)
-            throw new ArgumentNullException(nameof(candidateAction));
-
-        var baseline = Run(baselineName, baselineAction, config);
-        var candidate = Run(candidateName, candidateAction, config);
-
-        return new ComparisonResult(name: name, baseline: baseline, candidate: candidate);
-    }
+    #endregion
 }

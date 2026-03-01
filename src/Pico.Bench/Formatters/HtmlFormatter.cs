@@ -7,12 +7,6 @@ namespace Pico.Bench.Formatters;
 public sealed class HtmlFormatter(FormatterOptions? options = null) : FormatterBase(options)
 {
     /// <inheritdoc />
-    protected override string FormatCore(BenchmarkResult result)
-    {
-        return FormatCore([result]);
-    }
-
-    /// <inheritdoc />
     protected override string FormatCore(IEnumerable<BenchmarkResult> results)
     {
         var sb = new StringBuilder();
@@ -36,12 +30,6 @@ public sealed class HtmlFormatter(FormatterOptions? options = null) : FormatterB
         AppendHtmlFooter(sb);
 
         return sb.ToString();
-    }
-
-    /// <inheritdoc />
-    protected override string FormatCore(ComparisonResult comparison)
-    {
-        return FormatCore([comparison]);
     }
 
     /// <inheritdoc />
@@ -409,7 +397,10 @@ footer {
 
     #region Comparisons
 
-    private static void AppendComparisonSummary(StringBuilder sb, List<ComparisonResult> comparisons)
+    private static void AppendComparisonSummary(
+        StringBuilder sb,
+        List<ComparisonResult> comparisons
+    )
     {
         var wins = comparisons.Count(c => c.IsFaster);
         var total = comparisons.Count;

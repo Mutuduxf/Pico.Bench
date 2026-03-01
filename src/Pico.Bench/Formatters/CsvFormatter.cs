@@ -8,12 +8,6 @@ public sealed class CsvFormatter(FormatterOptions? options = null) : FormatterBa
     private const string Separator = ",";
 
     /// <inheritdoc />
-    protected override string FormatCore(BenchmarkResult result)
-    {
-        return FormatCore([result]);
-    }
-
-    /// <inheritdoc />
     protected override string FormatCore(IEnumerable<BenchmarkResult> results)
     {
         var sb = new StringBuilder();
@@ -32,12 +26,6 @@ public sealed class CsvFormatter(FormatterOptions? options = null) : FormatterBa
         }
 
         return sb.ToString();
-    }
-
-    /// <inheritdoc />
-    protected override string FormatCore(ComparisonResult comparison)
-    {
-        return FormatCore([comparison]);
     }
 
     /// <inheritdoc />
