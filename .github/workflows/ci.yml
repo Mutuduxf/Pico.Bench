@@ -18,7 +18,7 @@ jobs:
     timeout-minutes: 10
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest, macos-latest]
     
     steps:
     - name: Checkout repository
@@ -32,7 +32,7 @@ jobs:
         dotnet-version: ${{ env.DOTNET_VERSION }}
     
     - name: Cache NuGet packages
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ~/.nuget/packages
         key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
@@ -46,7 +46,7 @@ jobs:
       run: dotnet build --configuration Release --no-restore -p:UseProjectReferences=true
     
     - name: Run tests
-      run: dotnet test --project tests/Pico.Bench.Tests/Pico.Bench.TUnit.Tests.csproj --configuration Release --no-build --verbosity normal --timeout 120s --no-progress --no-ansi
+      run: dotnet test --project tests/Pico.Bench.Tests/Pico.Bench.TUnit.Tests.csproj --configuration Release --no-build --verbosity normal --timeout 120s --no-progress --no-ansi -p:UseProjectReferences=true
 
   pack:
     name: Pack
@@ -71,7 +71,7 @@ jobs:
         dotnet-version: ${{ env.DOTNET_VERSION }}
     
     - name: Cache NuGet packages
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ~/.nuget/packages
         key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
@@ -84,8 +84,21 @@ jobs:
     - name: Build
       run: dotnet build --configuration Release --no-restore -p:Version=${{ steps.version.outputs.VERSION }} -p:UseProjectReferences=true
     
-    - name: Pack NuGet package
-      run: dotnet pack src/Pico.Bench/Pico.Bench.csproj --configuration Release --no-build --output ./nupkg --include-symbols -p:Version=${{ steps.version.outputs.VERSION }} -p:UseProjectReferences=false
+    - name: Pack NuGet packages
+      run: |
+        # Clean output directory
+        rm -rf ./nupkg
+        mkdir -p ./nupkg
+        
+        # Pack main library with embedded source generator
+        # Using -p:UseProjectReferences=false to validate NuGet dependencies
+        dotnet pack src/Pico.Bench/Pico.Bench.csproj \
+          --configuration Release \
+          --output ./nupkg \
+          -p:Version=${{ steps.version.outputs.VERSION }} \
+          -p:UseProjectReferences=false \
+          -p:ContinuousIntegrationBuild=true \
+          -p:Deterministic=true
     
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
