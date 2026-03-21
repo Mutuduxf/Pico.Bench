@@ -17,6 +17,7 @@
         <PackageTags>benchmark;performance;testing;cross-platform;aot;source-generator</PackageTags>
         <PackageLicenseExpression>MIT</PackageLicenseExpression>
         <PackageReadmeFile>README.md</PackageReadmeFile>
+        <IsPackable>true</IsPackable>
     </PropertyGroup>
 
     <ItemGroup>
