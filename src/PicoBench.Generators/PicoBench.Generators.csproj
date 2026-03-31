@@ -19,7 +19,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <InternalsVisibleTo Include="PicoBench.TUnit.Tests" />
+        <InternalsVisibleTo Include="PicoBench.Tests" />
     </ItemGroup>
 
 </Project>

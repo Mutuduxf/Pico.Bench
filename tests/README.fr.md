@@ -9,7 +9,7 @@ Tests unitaires pour **PicoBench** utilisant le framework de test [TUnit](https:
 ## Exécution
 
 ```bash
-dotnet run --project tests/PicoBench.Tests/PicoBench.TUnit.Tests.csproj -c Debug
+dotnet run --project tests/PicoBench.Tests/PicoBench.Tests.csproj -c Debug
 ```
 
 ## Catégories de Tests

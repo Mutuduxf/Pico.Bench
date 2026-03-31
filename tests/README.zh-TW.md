@@ -9,7 +9,7 @@
 ## 運行
 
 ```bash
-dotnet run --project tests/PicoBench.Tests/PicoBench.TUnit.Tests.csproj -c Debug
+dotnet run --project tests/PicoBench.Tests/PicoBench.Tests.csproj -c Debug
 ```
 
 ## 測試分類

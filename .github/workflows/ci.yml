@@ -46,7 +46,7 @@ jobs:
       run: dotnet build --configuration Release --no-restore -p:UseProjectReferences=true
     
     - name: Run tests
-      run: dotnet test --project tests/PicoBench.Tests/PicoBench.TUnit.Tests.csproj --configuration Release --no-build --verbosity normal --timeout 120s --no-progress --no-ansi -p:UseProjectReferences=true
+      run: dotnet test --project tests/PicoBench.Tests/PicoBench.Tests.csproj --configuration Release --no-build --verbosity normal --timeout 120s --no-progress --no-ansi -p:UseProjectReferences=true
 
   pack:
     name: Pack

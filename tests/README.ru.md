@@ -9,7 +9,7 @@
 ## Запуск
 
 ```bash
-dotnet run --project tests/PicoBench.Tests/PicoBench.TUnit.Tests.csproj -c Debug
+dotnet run --project tests/PicoBench.Tests/PicoBench.Tests.csproj -c Debug
 ```
 
 ## Категории тестов
