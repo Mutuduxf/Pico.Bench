@@ -2,25 +2,6 @@ namespace PicoBench.Tests.Integration;
 
 public class FormatterIntegrationTests
 {
-    private static readonly string TestOutputDir = Path.Combine(
-        Path.GetTempPath(),
-        $"PicoBenchIntegrationTests_{Guid.NewGuid():N}"
-    );
-
-    [Before(Assembly)]
-    public static async Task AssemblySetup()
-    {
-        Directory.CreateDirectory(TestOutputDir);
-    }
-
-    [After(Assembly)]
-    public static async Task AssemblyCleanup()
-    {
-        if (Directory.Exists(TestOutputDir))
-        {
-            Directory.Delete(TestOutputDir, recursive: true);
-        }
-    }
 
     [Before(Test)]
     public async Task TestSetup(TestContext context)
@@ -57,14 +38,22 @@ public class FormatterIntegrationTests
     public async Task CsvFormatter_WriteToFile_CreatesValidFile()
     {
         var result = BenchmarkResultFactory.Create();
-        var filePath = Path.Combine(TestOutputDir, $"test_{Guid.NewGuid():N}.csv");
+        var testDir = FileSystemHelper.CreateTestDirectory();
+        try
+        {
+            var filePath = Path.Combine(testDir, $"test_{Guid.NewGuid():N}.csv");
 
-        CsvFormatter.WriteToFile(filePath, result);
+            CsvFormatter.WriteToFile(filePath, result);
 
-        await Assert.That(File.Exists(filePath)).IsTrue();
-        var content = await File.ReadAllTextAsync(filePath);
-        await Assert.That(content).Contains(result.Name);
-        await Assert.That(content).Contains("Avg");
+            await Assert.That(File.Exists(filePath)).IsTrue();
+            var content = await File.ReadAllTextAsync(filePath);
+            await Assert.That(content).Contains(result.Name);
+            await Assert.That(content).Contains("Avg");
+        }
+        finally
+        {
+            FileSystemHelper.DeleteTestDirectory(testDir);
+        }
     }
 
     [Test]
@@ -75,14 +64,22 @@ public class FormatterIntegrationTests
     public async Task HtmlFormatter_WriteToFile_CreatesValidFile()
     {
         var result = BenchmarkResultFactory.Create();
-        var filePath = Path.Combine(TestOutputDir, $"test_{Guid.NewGuid():N}.html");
+        var testDir = FileSystemHelper.CreateTestDirectory();
+        try
+        {
+            var filePath = Path.Combine(testDir, $"test_{Guid.NewGuid():N}.html");
 
-        HtmlFormatter.WriteToFile(filePath, result);
+            HtmlFormatter.WriteToFile(filePath, result);
 
-        await Assert.That(File.Exists(filePath)).IsTrue();
-        var content = await File.ReadAllTextAsync(filePath);
-        await Assert.That(content).Contains("<html");
-        await Assert.That(content).Contains(result.Name);
+            await Assert.That(File.Exists(filePath)).IsTrue();
+            var content = await File.ReadAllTextAsync(filePath);
+            await Assert.That(content).Contains("<html");
+            await Assert.That(content).Contains(result.Name);
+        }
+        finally
+        {
+            FileSystemHelper.DeleteTestDirectory(testDir);
+        }
     }
 
     [Test]
@@ -129,6 +126,9 @@ public class FormatterIntegrationTests
         await Assert.That(csvOutput).IsNotNull();
         await Assert.That(htmlOutput).IsNotNull();
         await Assert.That(markdownOutput).IsNotNull();
+        await Assert.That(csvOutput).Contains("StdErr_ns");
+        await Assert.That(htmlOutput).Contains("StdErr (ns)");
+        await Assert.That(markdownOutput).Contains("StdErr (ns)");
 
         // Ensure each output contains all benchmark names
         foreach (var result in results)

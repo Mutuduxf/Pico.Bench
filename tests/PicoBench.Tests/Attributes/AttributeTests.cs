@@ -221,6 +221,6 @@ public class AttributeTests
         await Assert.That(attr.Values[0]).IsEqualTo("hello");
         await Assert.That(attr.Values[1]).IsEqualTo(42);
         await Assert.That(attr.Values[2]).IsEqualTo(3.14);
-        await Assert.That(attr.Values[3]).IsEqualTo(true);
+        await Assert.That((bool)attr.Values[3]).IsTrue();
     }
 }

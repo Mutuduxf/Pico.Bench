@@ -52,6 +52,8 @@ public class StatisticsCalculatorTests
         var result = Benchmark.Run("StdDevTest", () => { }, FastConfig);
 
         await Assert.That(result.Statistics.StdDev).IsGreaterThanOrEqualTo(0);
+        await Assert.That(result.Statistics.StandardError).IsGreaterThanOrEqualTo(0);
+        await Assert.That(result.Statistics.RelativeStdDevPercent).IsGreaterThanOrEqualTo(0);
     }
 
     // ─── Percentiles are ordered ────────────────────────────────────

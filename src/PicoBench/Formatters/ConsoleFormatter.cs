@@ -111,6 +111,18 @@ public sealed class ConsoleFormatter(FormatterOptions? options = null) : Formatt
             {
                 sb.AppendLine();
                 sb.AppendLine($"Environment: {suite.Environment}");
+                sb.AppendLine(
+                    $"CPU Counter: {EnvironmentInfo.DescribeCpuCycleMeasurement(suite.Environment.CpuCycleMeasurement)}"
+                );
+
+                if (!suite.Environment.CpuCyclesAvailable)
+                {
+                    sb.AppendLine("CPU Counter Note: unavailable on this platform/runtime");
+                }
+                else if (!suite.Environment.CpuCyclesAreMeaningful)
+                {
+                    sb.AppendLine("CPU Counter Note: proxy timing source, not true CPU cycles");
+                }
             }
 
             if (Options.IncludeTimestamp)
@@ -165,6 +177,16 @@ public sealed class ConsoleFormatter(FormatterOptions? options = null) : Formatt
         if (Options.IncludeGcInfo)
         {
             sb.AppendLine($"  GC (0/1/2): {FormatGcInfo(result.Statistics.GcInfo)}");
+        }
+
+        sb.AppendLine($"  StdDev: {FormatTime(result.Statistics.StdDev)} ns");
+        sb.AppendLine($"  StdErr: {FormatTime(result.Statistics.StandardError)} ns");
+
+        if (result.Statistics.HasHighVariance)
+        {
+            sb.AppendLine(
+                $"  Noise: High variance ({result.Statistics.RelativeStdDevPercent:F1}% RSD)"
+            );
         }
     }
 
@@ -635,6 +657,9 @@ public sealed class ConsoleFormatter(FormatterOptions? options = null) : Formatt
     {
         Console.WriteLine();
         Console.WriteLine($"Environment: {env}");
+        Console.WriteLine(
+            $"CPU Counter: {EnvironmentInfo.DescribeCpuCycleMeasurement(env.CpuCycleMeasurement)}"
+        );
         Console.WriteLine(
             $"Config: {config.SampleCount} samples × {config.IterationsPerSample} iterations"
         );

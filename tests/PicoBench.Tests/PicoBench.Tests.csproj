@@ -18,6 +18,9 @@
     
     <!-- TUnit testing framework -->
     <PackageReference Include="TUnit" Version="1.19.74" />
+
+    <!-- Roslyn APIs for generator integration tests -->
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.0.0" PrivateAssets="All" />
     
     <!-- File system helpers for test cleanup -->
     <PackageReference Include="System.IO.Abstractions" Version="22.1.0" PrivateAssets="All" />

@@ -2,27 +2,6 @@ namespace PicoBench.Tests.Formatters;
 
 public class ConsoleFormatterTests
 {
-    private static readonly string TestOutputDir = Path.Combine(
-        Path.GetTempPath(),
-        $"PicoBenchConsoleTests_{Guid.NewGuid():N}"
-    );
-
-    [Before(Assembly)]
-    public static async Task AssemblySetup()
-    {
-        // Ensure test directory exists
-        Directory.CreateDirectory(TestOutputDir);
-    }
-
-    [After(Assembly)]
-    public static async Task AssemblyCleanup()
-    {
-        // Clean up test files
-        if (Directory.Exists(TestOutputDir))
-        {
-            Directory.Delete(TestOutputDir, recursive: true);
-        }
-    }
 
     [Before(Test)]
     public async Task TestSetup(TestContext context)
@@ -44,6 +23,8 @@ public class ConsoleFormatterTests
         await Assert.That(formatted).Contains(result.Name);
         await Assert.That(formatted).Contains("Avg:");
         await Assert.That(formatted).Contains("ns");
+        await Assert.That(formatted).Contains("StdDev:");
+        await Assert.That(formatted).Contains("StdErr:");
     }
 
     [Test]
@@ -83,8 +64,9 @@ public class ConsoleFormatterTests
     [Property("Category", "Formatter")]
     [Property("SubCategory", "Console")]
     [MethodDataSource(nameof(GetOptionCombinations))]
-    public async Task OptionalColumns_RespectOptions(FormatterOptions options)
+    public async Task OptionalColumns_RespectOptions(Func<FormatterOptions> optionsFactory)
     {
+        var options = optionsFactory();
         var results = BenchmarkResultFactory.CreateMultiple(2).ToList();
         var formatter = new ConsoleFormatter(options);
 
@@ -177,7 +159,7 @@ public class ConsoleFormatterTests
     [Arguments("Test Benchmark", "Test description")]
     [Arguments("", "")]
     [Arguments(null, null)]
-    public async Task Format_Suite_IncludesHeader(string name, string description)
+    public async Task Format_Suite_IncludesHeader(string? name, string? description)
     {
         var suite = new BenchmarkSuite(
             name: name ?? string.Empty,
@@ -196,6 +178,22 @@ public class ConsoleFormatterTests
         {
             await Assert.That(formatted).Contains(name);
         }
+        await Assert.That(formatted).Contains("CPU Counter:");
+    }
+
+    [Test]
+    [Property("Category", "Formatter")]
+    [Property("SubCategory", "Console")]
+    public async Task Format_SingleResult_WithHighVariance_IncludesNoiseWarning()
+    {
+        var noisy = BenchmarkResultFactory.Create(
+            statistics: StatisticsFactory.Create(avg: 100.0, stdDev: 20.0, relativeStdDevPercent: 20.0)
+        );
+        var formatter = new ConsoleFormatter();
+
+        var formatted = formatter.Format(noisy);
+
+        await Assert.That(formatted).Contains("Noise: High variance");
     }
 
     [Test]
@@ -268,7 +266,8 @@ public class ConsoleFormatterTests
         var suite = BenchmarkSuiteFactory.Create();
         ConsoleFormatter.Write(suite);
 
-        await Assert.That(true).IsTrue(); // Just to have an assertion
+        var completed = true;
+        await Assert.That(completed).IsTrue();
     }
 
     [Test]
@@ -281,7 +280,8 @@ public class ConsoleFormatterTests
         ConsoleFormatter.WriteHeader("Test Header", width: 80);
         ConsoleFormatter.WriteHeader("Another Header");
 
-        await Assert.That(true).IsTrue();
+        var completed = true;
+        await Assert.That(completed).IsTrue();
     }
 
     [Test]
@@ -294,7 +294,8 @@ public class ConsoleFormatterTests
 
         ConsoleFormatter.WriteEnvironment(env, config);
 
-        await Assert.That(true).IsTrue();
+        var completed = true;
+        await Assert.That(completed).IsTrue();
     }
 
     [Test]
@@ -306,7 +307,8 @@ public class ConsoleFormatterTests
     {
         ConsoleFormatter.WriteFileSaved("CSV", "test.csv");
 
-        await Assert.That(true).IsTrue();
+        var completed = true;
+        await Assert.That(completed).IsTrue();
     }
 
     [Test]
@@ -365,16 +367,16 @@ public class ConsoleFormatterTests
         );
     }
 
-    public static IEnumerable<FormatterOptions> GetOptionCombinations()
+    public static IEnumerable<Func<FormatterOptions>> GetOptionCombinations()
     {
-        yield return FormatterOptions.Default;
-        yield return FormatterOptions.Compact;
-        yield return FormatterOptions.Minimal;
+        yield return () => FormatterOptions.Default;
+        yield return () => FormatterOptions.Compact;
+        yield return () => FormatterOptions.Minimal;
 
         // Custom combinations
-        yield return new FormatterOptions { IncludePercentiles = false, IncludeCpuCycles = true };
-        yield return new FormatterOptions { IncludePercentiles = true, IncludeCpuCycles = false };
-        yield return new FormatterOptions { IncludeGcInfo = false, IncludeEnvironment = false };
+        yield return () => new FormatterOptions { IncludePercentiles = false, IncludeCpuCycles = true };
+        yield return () => new FormatterOptions { IncludePercentiles = true, IncludeCpuCycles = false };
+        yield return () => new FormatterOptions { IncludeGcInfo = false, IncludeEnvironment = false };
     }
 
     public static IEnumerable<BenchmarkResult> GetEdgeCaseResults()

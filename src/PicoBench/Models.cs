@@ -77,11 +77,38 @@ public sealed class Statistics
     /// <summary>Standard deviation in nanoseconds.</summary>
     public double StdDev { get; init; }
 
+    /// <summary>Standard error of the mean in nanoseconds.</summary>
+    public double StandardError { get; init; }
+
+    /// <summary>Relative standard deviation as a percentage of the mean.</summary>
+    public double RelativeStdDevPercent { get; init; }
+
     /// <summary>Average CPU cycles per operation.</summary>
     public double CpuCyclesPerOp { get; init; }
 
     /// <summary>Aggregated GC info across all samples.</summary>
     public GcInfo GcInfo { get; init; } = new GcInfo();
+
+    /// <summary>Returns true when sample variation is high enough to question result stability.</summary>
+    public bool HasHighVariance => RelativeStdDevPercent >= 10.0;
+}
+
+/// <summary>
+/// Describes how the CPU cycle metric is collected on the current platform.
+/// </summary>
+public enum CpuCycleMeasurementKind
+{
+    /// <summary>No cycle-like measurement is available.</summary>
+    Unsupported,
+
+    /// <summary>Native thread cycle counts are used.</summary>
+    ThreadCycles,
+
+    /// <summary>Linux perf hardware CPU cycle events are used.</summary>
+    PerfEventCpuCycles,
+
+    /// <summary>A monotonic clock proxy is used instead of true CPU cycles.</summary>
+    MonotonicClockProxy
 }
 
 /// <summary>
@@ -113,6 +140,9 @@ public sealed class BenchmarkResult
     /// <summary>When the benchmark was run.</summary>
     public DateTime Timestamp { get; } = DateTime.UtcNow;
 
+    /// <summary>
+    /// Creates a benchmark result.
+    /// </summary>
     public BenchmarkResult(
         string name,
         Statistics statistics,
@@ -231,6 +261,9 @@ public sealed class BenchmarkSuite
     /// <summary>Total duration of the benchmark run.</summary>
     public TimeSpan Duration { get; }
 
+    /// <summary>
+    /// Creates a benchmark suite.
+    /// </summary>
     public BenchmarkSuite(
         string name,
         EnvironmentInfo environment,
@@ -281,10 +314,31 @@ public sealed class EnvironmentInfo
         "Release";
 #endif
 
+    /// <summary>How the CPU cycle metric is collected on this runtime.</summary>
+    public CpuCycleMeasurementKind CpuCycleMeasurement { get; init; } =
+        Runner.GetCpuCycleMeasurementKind();
+
+    /// <summary>Whether a cycle-like metric is available at all.</summary>
+    public bool CpuCyclesAvailable { get; init; } = Runner.AreCpuCyclesAvailable();
+
+    /// <summary>Whether the cycle metric represents meaningful CPU cycles rather than a proxy timer.</summary>
+    public bool CpuCyclesAreMeaningful { get; init; } = Runner.HasMeaningfulCpuCycles();
+
     /// <summary>Custom environment tags.</summary>
     public IReadOnlyDictionary<string, string>? CustomTags { get; init; }
 
     /// <inheritdoc />
     public override string ToString() =>
-        $"{RuntimeVersion} | {Os} | {Architecture} | {(IsNativeAot ? "AOT" : "JIT")} | {Configuration}";
+        $"{RuntimeVersion} | {Os} | {Architecture} | {(IsNativeAot ? "AOT" : "JIT")} | {Configuration} | Cycles: {DescribeCpuCycleMeasurement(CpuCycleMeasurement)}";
+
+    internal static string DescribeCpuCycleMeasurement(CpuCycleMeasurementKind kind)
+    {
+        return kind switch
+        {
+            CpuCycleMeasurementKind.ThreadCycles => "ThreadCycles",
+            CpuCycleMeasurementKind.PerfEventCpuCycles => "PerfEventCpuCycles",
+            CpuCycleMeasurementKind.MonotonicClockProxy => "MonotonicClockProxy",
+            _ => "Unsupported"
+        };
+    }
 }

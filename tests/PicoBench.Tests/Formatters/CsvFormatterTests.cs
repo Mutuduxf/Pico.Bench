@@ -2,25 +2,6 @@ namespace PicoBench.Tests.Formatters;
 
 public class CsvFormatterTests
 {
-    private static readonly string TestOutputDir = Path.Combine(
-        Path.GetTempPath(),
-        $"PicoBenchCsvTests_{Guid.NewGuid():N}"
-    );
-
-    [Before(Assembly)]
-    public static async Task AssemblySetup()
-    {
-        Directory.CreateDirectory(TestOutputDir);
-    }
-
-    [After(Assembly)]
-    public static async Task AssemblyCleanup()
-    {
-        if (Directory.Exists(TestOutputDir))
-        {
-            Directory.Delete(TestOutputDir, recursive: true);
-        }
-    }
 
     [Test]
     [Property("Category", "Formatter")]
@@ -87,8 +68,7 @@ public class CsvFormatterTests
     [Property("SubCategory", "CSV")]
     [Property("FileSystem", "true")]
     [NotInParallel]
-    [MethodDataSource(nameof(GetDummyTestContext))]
-    public async Task WriteToFile_CreatesNewFile(TestContext context)
+    public async Task WriteToFile_CreatesNewFile()
     {
         var testDir = FileSystemHelper.CreateTestDirectory();
         try
@@ -103,7 +83,6 @@ public class CsvFormatterTests
             await Assert.That(content).Contains("Name,Category,Avg_ns,P50_ns");
             await Assert.That(content).Contains(result.Name);
 
-            context?.LogFileOperation("WriteToFile", filePath);
         }
         finally
         {
@@ -116,8 +95,7 @@ public class CsvFormatterTests
     [Property("SubCategory", "CSV")]
     [Property("FileSystem", "true")]
     [NotInParallel]
-    [MethodDataSource(nameof(GetDummyTestContext))]
-    public async Task AppendToFile_SkipsHeaderWhenFileExists(TestContext context)
+    public async Task AppendToFile_SkipsHeaderWhenFileExists()
     {
         var testDir = FileSystemHelper.CreateTestDirectory();
         try
@@ -145,7 +123,6 @@ public class CsvFormatterTests
                 .That(content.IndexOf("Name,Category,Avg_ns,P50_ns"))
                 .IsEqualTo(content.LastIndexOf("Name,Category,Avg_ns,P50_ns"));
 
-            context?.LogFileOperation("AppendToFile", filePath);
         }
         finally
         {
@@ -158,8 +135,7 @@ public class CsvFormatterTests
     [Property("SubCategory", "CSV")]
     [Property("FileSystem", "true")]
     [NotInParallel]
-    [MethodDataSource(nameof(GetDummyTestContext))]
-    public async Task AppendToFile_CreatesNewFileWhenNotExists(TestContext context)
+    public async Task AppendToFile_CreatesNewFileWhenNotExists()
     {
         var testDir = FileSystemHelper.CreateTestDirectory();
         try
@@ -174,7 +150,6 @@ public class CsvFormatterTests
             // Should include header since file didn't exist
             await Assert.That(content).Contains("Name,Category,Avg_ns,P50_ns");
 
-            context?.LogFileOperation("AppendToFile (new)", filePath);
         }
         finally
         {
@@ -216,14 +191,16 @@ public class CsvFormatterTests
         await Assert.That(csv).Contains("# Results");
         await Assert.That(csv).Contains("# Comparisons");
         await Assert.That(csv).Contains(suite.Name);
+        await Assert.That(csv).Contains("# CpuCounter:");
     }
 
     [Test]
     [Property("Category", "Formatter")]
     [Property("SubCategory", "CSV")]
     [MethodDataSource(nameof(GetOptionCombinations))]
-    public async Task OptionalColumns_RespectOptions(FormatterOptions options)
+    public async Task OptionalColumns_RespectOptions(Func<FormatterOptions> optionsFactory)
     {
+        var options = optionsFactory();
         var results = BenchmarkResultFactory.CreateMultiple(1).ToList();
         var formatter = new CsvFormatter(options);
 
@@ -237,6 +214,8 @@ public class CsvFormatterTests
             await Assert.That(csv).Contains("Min_ns");
             await Assert.That(csv).Contains("Max_ns");
             await Assert.That(csv).Contains("StdDev_ns");
+            await Assert.That(csv).Contains("StdErr_ns");
+            await Assert.That(csv).Contains("RSD_pct");
         }
         else
         {
@@ -280,10 +259,27 @@ public class CsvFormatterTests
     [Test]
     [Property("Category", "Formatter")]
     [Property("SubCategory", "CSV")]
+    public async Task Format_Results_IncludesPrecisionColumns()
+    {
+        var result = BenchmarkResultFactory.Create(
+            statistics: StatisticsFactory.Create(standardError: 2.5, relativeStdDevPercent: 12.3)
+        );
+        var formatter = new CsvFormatter();
+
+        var csv = formatter.Format(result);
+
+        await Assert.That(csv).Contains("StdErr_ns");
+        await Assert.That(csv).Contains("RSD_pct");
+        await Assert.That(csv).Contains("2.5");
+        await Assert.That(csv).Contains("12.3");
+    }
+
+    [Test]
+    [Property("Category", "Formatter")]
+    [Property("SubCategory", "CSV")]
     [Property("FileSystem", "true")]
     [NotInParallel]
-    [MethodDataSource(nameof(GetDummyTestContext))]
-    public async Task WriteToFile_MultipleResults_CreatesValidCsv(TestContext context)
+    public async Task WriteToFile_MultipleResults_CreatesValidCsv()
     {
         var testDir = FileSystemHelper.CreateTestDirectory();
         try
@@ -299,7 +295,6 @@ public class CsvFormatterTests
 
             await Assert.That(lines.Length).IsEqualTo(4); // Header + 3 rows
 
-            context?.LogFileOperation("WriteToFile multiple", filePath);
         }
         finally
         {
@@ -312,8 +307,7 @@ public class CsvFormatterTests
     [Property("SubCategory", "CSV")]
     [Property("FileSystem", "true")]
     [NotInParallel]
-    [MethodDataSource(nameof(GetDummyTestContext))]
-    public async Task WriteToFile_Comparisons_CreatesValidCsv(TestContext context)
+    public async Task WriteToFile_Comparisons_CreatesValidCsv()
     {
         var testDir = FileSystemHelper.CreateTestDirectory();
         try
@@ -329,7 +323,6 @@ public class CsvFormatterTests
 
             await Assert.That(lines.Length).IsEqualTo(5); // Header + (2 * 2) rows
 
-            context?.LogFileOperation("WriteToFile comparisons", filePath);
         }
         finally
         {
@@ -342,8 +335,7 @@ public class CsvFormatterTests
     [Property("SubCategory", "CSV")]
     [Property("FileSystem", "true")]
     [NotInParallel]
-    [MethodDataSource(nameof(GetDummyTestContext))]
-    public async Task WriteToFile_Suite_CreatesValidCsv(TestContext context)
+    public async Task WriteToFile_Suite_CreatesValidCsv()
     {
         var testDir = FileSystemHelper.CreateTestDirectory();
         try
@@ -360,7 +352,6 @@ public class CsvFormatterTests
             await Assert.That(content).Contains("# Results");
             await Assert.That(content).Contains("# Comparisons");
 
-            context?.LogFileOperation("WriteToFile suite", filePath);
         }
         finally
         {
@@ -422,22 +413,17 @@ public class CsvFormatterTests
         yield return ("   ", "normal");
     }
 
-    public static IEnumerable<FormatterOptions> GetOptionCombinations()
+    public static IEnumerable<Func<FormatterOptions>> GetOptionCombinations()
     {
-        yield return FormatterOptions.Default;
-        yield return FormatterOptions.Compact;
-        yield return FormatterOptions.Minimal;
+        yield return () => FormatterOptions.Default;
+        yield return () => FormatterOptions.Compact;
+        yield return () => FormatterOptions.Minimal;
 
         // Custom combinations
-        yield return new FormatterOptions { IncludePercentiles = false };
-        yield return new FormatterOptions { IncludeCpuCycles = false };
-        yield return new FormatterOptions { IncludeGcInfo = false };
-        yield return new FormatterOptions { IncludeTimestamp = false };
-        yield return new FormatterOptions { IncludeEnvironment = false };
-    }
-
-    public static IEnumerable<TestContext> GetDummyTestContext()
-    {
-        yield return null!;
+        yield return () => new FormatterOptions { IncludePercentiles = false };
+        yield return () => new FormatterOptions { IncludeCpuCycles = false };
+        yield return () => new FormatterOptions { IncludeGcInfo = false };
+        yield return () => new FormatterOptions { IncludeTimestamp = false };
+        yield return () => new FormatterOptions { IncludeEnvironment = false };
     }
 }

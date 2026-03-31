@@ -143,7 +143,18 @@ public class ModelsTests
         await Assert.That(stats.Min).IsEqualTo(120.0);
         await Assert.That(stats.Max).IsEqualTo(200.0);
         await Assert.That(stats.StdDev).IsEqualTo(20.0);
+        await Assert.That(stats.StandardError).IsGreaterThan(0);
+        await Assert.That(stats.RelativeStdDevPercent).IsGreaterThan(0);
         await Assert.That(stats.CpuCyclesPerOp).IsEqualTo(300.0);
+    }
+
+    [Test]
+    [Property("Category", "Models")]
+    public async Task Statistics_HighVariance_ComputedFromRelativeStdDev()
+    {
+        var stats = StatisticsFactory.Create(avg: 100.0, stdDev: 20.0, relativeStdDevPercent: 20.0);
+
+        await Assert.That(stats.HasHighVariance).IsTrue();
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -531,6 +542,23 @@ public class ModelsTests
         await Assert.That(str).Contains(env.RuntimeVersion);
         await Assert.That(str).Contains(env.Os);
         await Assert.That(str).Contains(env.Architecture);
+        await Assert.That(str).Contains("Cycles:");
+    }
+
+    [Test]
+    [Property("Category", "Models")]
+    public async Task EnvironmentInfo_CpuCycleFlags_CanBeSet()
+    {
+        var env = new EnvironmentInfo
+        {
+            CpuCycleMeasurement = CpuCycleMeasurementKind.MonotonicClockProxy,
+            CpuCyclesAvailable = true,
+            CpuCyclesAreMeaningful = false
+        };
+
+        await Assert.That(env.CpuCycleMeasurement).IsEqualTo(CpuCycleMeasurementKind.MonotonicClockProxy);
+        await Assert.That(env.CpuCyclesAvailable).IsTrue();
+        await Assert.That(env.CpuCyclesAreMeaningful).IsFalse();
     }
 
     [Test]

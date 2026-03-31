@@ -60,6 +60,8 @@ internal static class StatisticsCalculator
             variance = m2 / (perOpTimes.Length - 1);
         }
         var stdDev = Math.Sqrt(Math.Max(0, variance));
+        var standardError = perOpTimes.Length > 0 ? stdDev / Math.Sqrt(perOpTimes.Length) : 0.0;
+        var relativeStdDevPercent = Math.Abs(avg) < 1e-12 ? 0.0 : (stdDev / Math.Abs(avg)) * 100.0;
 
         // Calculate CPU cycles average
         var cpuCyclesSum = 0.0;
@@ -79,6 +81,8 @@ internal static class StatisticsCalculator
             Min = min,
             Max = max,
             StdDev = stdDev,
+            StandardError = standardError,
+            RelativeStdDevPercent = relativeStdDevPercent,
             CpuCyclesPerOp = cpuCyclesAvg,
             GcInfo = new GcInfo
             {

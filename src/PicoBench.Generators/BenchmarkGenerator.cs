@@ -1,8 +1,12 @@
 namespace PicoBench.Generators;
 
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+
 /// <summary>
 /// Incremental source generator that discovers [BenchmarkClass]-attributed types
-/// and generates AOT-compatible <see cref="IBenchmarkClass"/> implementations.
+/// and generates AOT-compatible <c>IBenchmarkClass</c> implementations.
 /// </summary>
 [Generator]
 public sealed class BenchmarkGenerator : IIncrementalGenerator
@@ -16,6 +20,9 @@ public sealed class BenchmarkGenerator : IIncrementalGenerator
     private const string IterationCleanupAttr = "PicoBench.IterationCleanupAttribute";
     private const string ParamsAttr = "PicoBench.ParamsAttribute";
 
+    /// <summary>
+    /// Configures the incremental pipelines that validate benchmark classes and emit source.
+    /// </summary>
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
         var provider = context
@@ -23,15 +30,22 @@ public sealed class BenchmarkGenerator : IIncrementalGenerator
             .ForAttributeWithMetadataName(
                 BenchmarkClassAttr,
                 predicate: static (node, _) => node is ClassDeclarationSyntax,
-                transform: static (ctx, ct) => ExtractModel(ctx, ct)
+                transform: static (ctx, ct) => AnalyzeTarget(ctx, ct)
             )
-            .Where(static m => m is not null)
-            .Select(static (m, _) => m!);
+            .Where(static result => result is not null)
+            .Select(static (result, _) => result!);
 
         context.RegisterSourceOutput(
             provider,
-            static (spc, model) =>
+            static (spc, result) =>
             {
+                foreach (var diagnostic in result.Diagnostics)
+                    spc.ReportDiagnostic(diagnostic);
+
+                if (result.Model is null || result.HasErrors)
+                    return;
+
+                var model = result.Model;
                 var code = Emitter.Generate(model);
                 var hintName = model.Namespace is null
                     ? model.ClassName
@@ -42,15 +56,28 @@ public sealed class BenchmarkGenerator : IIncrementalGenerator
         );
     }
 
-    private static BenchmarkClassModel? ExtractModel(
+    private static GeneratorAnalysisResult AnalyzeTarget(
         GeneratorAttributeSyntaxContext ctx,
         System.Threading.CancellationToken ct
     )
     {
+        var diagnostics = new List<Diagnostic>();
+
         if (ctx.TargetSymbol is not INamedTypeSymbol typeSymbol)
-            return null;
+            return new GeneratorAnalysisResult(null, diagnostics.ToImmutableArray());
 
         ct.ThrowIfCancellationRequested();
+
+        if (!IsPartial(typeSymbol))
+        {
+            diagnostics.Add(
+                Diagnostic.Create(
+                    DiagnosticDescriptors.BenchmarkClassMustBePartial,
+                    GetTypeLocation(typeSymbol),
+                    typeSymbol.Name
+                )
+            );
+        }
 
         // Namespace
         var ns = typeSymbol.ContainingNamespace.IsGlobalNamespace
@@ -84,6 +111,7 @@ public sealed class BenchmarkGenerator : IIncrementalGenerator
         string? globalCleanup = null;
         string? iterSetup = null;
         string? iterCleanup = null;
+        var baselineMethod = default(string);
         var methods = ImmutableArray.CreateBuilder<BenchmarkMethodModel>();
         var paramsProps = ImmutableArray.CreateBuilder<ParamsPropertyModel>();
 
@@ -102,6 +130,18 @@ public sealed class BenchmarkGenerator : IIncrementalGenerator
                         {
                             case BenchmarkAttr:
                             {
+                                if (!IsValidBenchmarkMethod(method))
+                                {
+                                    diagnostics.Add(
+                                        Diagnostic.Create(
+                                            DiagnosticDescriptors.InvalidBenchmarkMethod,
+                                            GetAttributeLocation(attr, ct),
+                                            method.Name
+                                        )
+                                    );
+                                    break;
+                                }
+
                                 var isBaseline = false;
                                 string? methodDesc = null;
                                 foreach (var named in attr.NamedArguments)
@@ -117,6 +157,20 @@ public sealed class BenchmarkGenerator : IIncrementalGenerator
                                     }
                                 }
 
+                                if (isBaseline && baselineMethod is not null)
+                                {
+                                    diagnostics.Add(
+                                        Diagnostic.Create(
+                                            DiagnosticDescriptors.DuplicateBaseline,
+                                            GetAttributeLocation(attr, ct)
+                                        )
+                                    );
+                                    break;
+                                }
+
+                                if (isBaseline)
+                                    baselineMethod = method.Name;
+
                                 methods.Add(
                                     new BenchmarkMethodModel
                                     {
@@ -128,16 +182,44 @@ public sealed class BenchmarkGenerator : IIncrementalGenerator
                                 break;
                             }
                             case GlobalSetupAttr:
-                                globalSetup = method.Name;
+                                RegisterLifecycleMethod(
+                                    method,
+                                    attr,
+                                    ref globalSetup,
+                                    "[GlobalSetup]",
+                                    diagnostics,
+                                    ct
+                                );
                                 break;
                             case GlobalCleanupAttr:
-                                globalCleanup = method.Name;
+                                RegisterLifecycleMethod(
+                                    method,
+                                    attr,
+                                    ref globalCleanup,
+                                    "[GlobalCleanup]",
+                                    diagnostics,
+                                    ct
+                                );
                                 break;
                             case IterationSetupAttr:
-                                iterSetup = method.Name;
+                                RegisterLifecycleMethod(
+                                    method,
+                                    attr,
+                                    ref iterSetup,
+                                    "[IterationSetup]",
+                                    diagnostics,
+                                    ct
+                                );
                                 break;
                             case IterationCleanupAttr:
-                                iterCleanup = method.Name;
+                                RegisterLifecycleMethod(
+                                    method,
+                                    attr,
+                                    ref iterCleanup,
+                                    "[IterationCleanup]",
+                                    diagnostics,
+                                    ct
+                                );
                                 break;
                         }
                     }
@@ -148,35 +230,137 @@ public sealed class BenchmarkGenerator : IIncrementalGenerator
                 {
                     var paramAttr = FindAttribute(prop.GetAttributes(), ParamsAttr);
                     if (paramAttr != null)
-                        paramsProps.Add(BuildParamsModel(prop.Name, prop.Type, paramAttr));
+                    {
+                        var paramModel = BuildParamsModel(
+                            prop,
+                            prop.Name,
+                            prop.Type,
+                            paramAttr,
+                            ctx.SemanticModel.Compilation,
+                            diagnostics,
+                            ct
+                        );
+                        if (paramModel is not null)
+                            paramsProps.Add(paramModel);
+                    }
                     break;
                 }
                 case IFieldSymbol field:
                 {
                     var paramAttr = FindAttribute(field.GetAttributes(), ParamsAttr);
                     if (paramAttr != null)
-                        paramsProps.Add(BuildParamsModel(field.Name, field.Type, paramAttr));
+                    {
+                        var paramModel = BuildParamsModel(
+                            field,
+                            field.Name,
+                            field.Type,
+                            paramAttr,
+                            ctx.SemanticModel.Compilation,
+                            diagnostics,
+                            ct
+                        );
+                        if (paramModel is not null)
+                            paramsProps.Add(paramModel);
+                    }
                     break;
                 }
             }
         }
 
         if (methods.Count == 0)
-            return null; // No benchmark methods found; skip generation.
-
-        return new BenchmarkClassModel
         {
-            Namespace = ns,
-            ClassName = typeSymbol.Name,
-            AccessModifier = accessibility,
-            Description = description,
-            GlobalSetupMethod = globalSetup,
-            GlobalCleanupMethod = globalCleanup,
-            IterationSetupMethod = iterSetup,
-            IterationCleanupMethod = iterCleanup,
-            Methods = methods.ToImmutable(),
-            ParamsProperties = paramsProps.ToImmutable()
-        };
+            diagnostics.Add(
+                Diagnostic.Create(
+                    DiagnosticDescriptors.NoBenchmarkMethods,
+                    GetTypeLocation(typeSymbol),
+                    typeSymbol.Name
+                )
+            );
+        }
+
+        if (diagnostics.Any(static d => d.Severity == DiagnosticSeverity.Error))
+            return new GeneratorAnalysisResult(null, diagnostics.ToImmutableArray());
+
+        return new GeneratorAnalysisResult(
+            new BenchmarkClassModel
+            {
+                Namespace = ns,
+                ClassName = typeSymbol.Name,
+                AccessModifier = accessibility,
+                Description = description,
+                GlobalSetupMethod = globalSetup,
+                GlobalCleanupMethod = globalCleanup,
+                IterationSetupMethod = iterSetup,
+                IterationCleanupMethod = iterCleanup,
+                Methods = methods.ToImmutable(),
+                ParamsProperties = paramsProps.ToImmutable()
+            },
+            diagnostics.ToImmutableArray()
+        );
+    }
+
+    private static bool IsPartial(INamedTypeSymbol typeSymbol)
+    {
+        foreach (var syntaxRef in typeSymbol.DeclaringSyntaxReferences)
+        {
+            if (syntaxRef.GetSyntax() is ClassDeclarationSyntax classDecl
+                && classDecl.Modifiers.Any(static m => m.IsKind(SyntaxKind.PartialKeyword)))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsValidBenchmarkMethod(IMethodSymbol method)
+    {
+        return !method.IsStatic && !method.IsGenericMethod && method.Parameters.Length == 0;
+    }
+
+    private static bool IsValidLifecycleMethod(IMethodSymbol method)
+    {
+        return !method.IsStatic
+            && !method.IsGenericMethod
+            && method.Parameters.Length == 0
+            && method.ReturnsVoid;
+    }
+
+    private static void RegisterLifecycleMethod(
+        IMethodSymbol method,
+        AttributeData attr,
+        ref string? target,
+        string attributeName,
+        List<Diagnostic> diagnostics,
+        System.Threading.CancellationToken ct
+    )
+    {
+        if (!IsValidLifecycleMethod(method))
+        {
+            diagnostics.Add(
+                Diagnostic.Create(
+                    DiagnosticDescriptors.InvalidLifecycleMethod,
+                    GetAttributeLocation(attr, ct),
+                    attributeName,
+                    method.Name
+                )
+            );
+            return;
+        }
+
+        if (target is not null)
+        {
+            diagnostics.Add(
+                Diagnostic.Create(
+                    DiagnosticDescriptors.DuplicateLifecycleMethod,
+                    GetAttributeLocation(attr, ct),
+                    attributeName
+                )
+            );
+            return;
+        }
+
+        target = method.Name;
     }
 
     private static AttributeData? FindAttribute(
@@ -191,11 +375,27 @@ public sealed class BenchmarkGenerator : IIncrementalGenerator
     }
 
     private static ParamsPropertyModel BuildParamsModel(
+        ISymbol memberSymbol,
         string memberName,
         ITypeSymbol memberType,
-        AttributeData attr
+        AttributeData attr,
+        Compilation compilation,
+        List<Diagnostic> diagnostics,
+        System.Threading.CancellationToken ct
     )
     {
+        if (!IsValidParamsMember(memberSymbol))
+        {
+            diagnostics.Add(
+                Diagnostic.Create(
+                    DiagnosticDescriptors.InvalidParamsMember,
+                    GetAttributeLocation(attr, ct),
+                    memberName
+                )
+            );
+            return null!;
+        }
+
         var typeName = memberType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
         var values = ImmutableArray.CreateBuilder<string>();
 
@@ -214,8 +414,25 @@ public sealed class BenchmarkGenerator : IIncrementalGenerator
                 TypeFullName = typeName,
                 FormattedValues = values.ToImmutable()
             };
+
         foreach (var element in arg.Values)
-            values.Add(FormatConstant(element));
+        {
+            if (!IsCompatibleWithTargetType(element, memberType, compilation))
+            {
+                diagnostics.Add(
+                    Diagnostic.Create(
+                        DiagnosticDescriptors.IncompatibleParamsValue,
+                        GetAttributeLocation(attr, ct),
+                        element.ToCSharpString(),
+                        memberName,
+                        memberType.ToDisplayString()
+                    )
+                );
+                return null!;
+            }
+
+            values.Add(FormatConstant(element, memberType));
+        }
 
         return new ParamsPropertyModel
         {
@@ -225,13 +442,44 @@ public sealed class BenchmarkGenerator : IIncrementalGenerator
         };
     }
 
+    private static bool IsValidParamsMember(ISymbol memberSymbol)
+    {
+        return memberSymbol switch
+        {
+            IPropertySymbol property => !property.IsStatic
+                && property.SetMethod is not null
+                && !property.SetMethod.IsInitOnly,
+            IFieldSymbol field => !field.IsStatic && !field.IsReadOnly && !field.IsConst,
+            _ => false
+        };
+    }
+
+    private static bool IsCompatibleWithTargetType(
+        TypedConstant constant,
+        ITypeSymbol memberType,
+        Compilation compilation
+    )
+    {
+        if (constant.IsNull)
+            return memberType.IsReferenceType || memberType.NullableAnnotation == NullableAnnotation.Annotated;
+
+        if (constant.Type is null)
+            return false;
+
+        var conversion = compilation.ClassifyConversion(constant.Type, memberType);
+        return conversion.Exists && (conversion.IsIdentity || conversion.IsImplicit);
+    }
+
     /// <summary>
     /// Formats a <see cref="TypedConstant"/> as a C# literal string.
     /// </summary>
-    private static string FormatConstant(TypedConstant constant)
+    private static string FormatConstant(TypedConstant constant, ITypeSymbol? targetType)
     {
         if (constant.IsNull)
             return "null";
+
+        if (targetType is INamedTypeSymbol enumType && enumType.TypeKind == TypeKind.Enum)
+            return FormatEnumLiteral(enumType, constant.Value);
 
         var value = constant.Value;
         return value switch
@@ -247,6 +495,61 @@ public sealed class BenchmarkGenerator : IIncrementalGenerator
             uint ui => ui.ToString(System.Globalization.CultureInfo.InvariantCulture) + "U",
             _ => value?.ToString() ?? "default"
         };
+    }
+
+    private static string FormatEnumLiteral(INamedTypeSymbol enumType, object? value)
+    {
+        var underlyingValue = value is null
+            ? "0"
+            : FormatPrimitiveNumericLiteral(value);
+
+        return $"({enumType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}){underlyingValue}";
+    }
+
+    private static string FormatPrimitiveNumericLiteral(object value)
+    {
+        return value switch
+        {
+            byte b => b.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            sbyte sb => sb.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            short s => s.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ushort us => us.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            int i => i.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            uint ui => ui.ToString(System.Globalization.CultureInfo.InvariantCulture) + "U",
+            long l => l.ToString(System.Globalization.CultureInfo.InvariantCulture) + "L",
+            ulong ul => ul.ToString(System.Globalization.CultureInfo.InvariantCulture) + "UL",
+            _ => Convert.ToString(value, System.Globalization.CultureInfo.InvariantCulture) ?? "0"
+        };
+    }
+
+    private static Location GetTypeLocation(INamedTypeSymbol typeSymbol)
+    {
+        return typeSymbol.Locations.FirstOrDefault(static location => location.IsInSource)
+            ?? Location.None;
+    }
+
+    private static Location GetAttributeLocation(
+        AttributeData attr,
+        System.Threading.CancellationToken ct
+    )
+    {
+        return attr.ApplicationSyntaxReference?.GetSyntax(ct).GetLocation() ?? Location.None;
+    }
+
+    private sealed class GeneratorAnalysisResult
+    {
+        public GeneratorAnalysisResult(
+            BenchmarkClassModel? model,
+            ImmutableArray<Diagnostic> diagnostics
+        )
+        {
+            Model = model;
+            Diagnostics = diagnostics;
+        }
+
+        public BenchmarkClassModel? Model { get; }
+        public ImmutableArray<Diagnostic> Diagnostics { get; }
+        public bool HasErrors => Diagnostics.Any(static d => d.Severity == DiagnosticSeverity.Error);
     }
 
     private static string FormatStringLiteral(string s)

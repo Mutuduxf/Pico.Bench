@@ -54,6 +54,33 @@ public sealed class BenchmarkConfig
     /// <summary>Whether to retain raw samples in the result.</summary>
     public bool RetainSamples { get; init; } = false;
 
+    /// <summary>
+    /// When enabled, PicoBench automatically increases iterations per sample until
+    /// a minimum timing budget is reached for more stable measurements.
+    /// </summary>
+    public bool AutoCalibrateIterations { get; init; } = false;
+
+    /// <summary>
+    /// Minimum elapsed time per sample targeted by auto-calibration.
+    /// </summary>
+    public TimeSpan MinSampleTime { get; init; } = TimeSpan.FromMilliseconds(0.25);
+
+    /// <summary>
+    /// Upper bound for iterations per sample when auto-calibration is enabled.
+    /// </summary>
+    public int MaxAutoIterationsPerSample
+    {
+        get;
+        init =>
+            field =
+                value > 0
+                    ? value
+                    : throw new ArgumentOutOfRangeException(
+                        nameof(MaxAutoIterationsPerSample),
+                        "MaxAutoIterationsPerSample must be positive."
+                    );
+    } = 1_000_000_000;
+
     /// <summary>Default configuration suitable for most benchmarks.</summary>
     public static BenchmarkConfig Default => _default ??= new BenchmarkConfig();
 
@@ -63,7 +90,8 @@ public sealed class BenchmarkConfig
         {
             WarmupIterations = 100,
             SampleCount = 10,
-            IterationsPerSample = 1000
+            IterationsPerSample = 1000,
+            AutoCalibrateIterations = true
         };
 
     /// <summary>Precise configuration for final measurements.</summary>
@@ -72,6 +100,8 @@ public sealed class BenchmarkConfig
         {
             WarmupIterations = 5000,
             SampleCount = 200,
-            IterationsPerSample = 50000
+            IterationsPerSample = 50000,
+            AutoCalibrateIterations = true,
+            MinSampleTime = TimeSpan.FromMilliseconds(1)
         };
 }

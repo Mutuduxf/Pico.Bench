@@ -20,6 +20,31 @@ public static partial class Runner
         _ = Initializer.Value;
     }
 
+    internal static CpuCycleMeasurementKind GetCpuCycleMeasurementKind()
+    {
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            return CpuCycleMeasurementKind.ThreadCycles;
+
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+            return _linuxPerfFd >= 0
+                ? CpuCycleMeasurementKind.PerfEventCpuCycles
+                : CpuCycleMeasurementKind.Unsupported;
+
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            return CpuCycleMeasurementKind.MonotonicClockProxy;
+
+        return CpuCycleMeasurementKind.Unsupported;
+    }
+
+    internal static bool AreCpuCyclesAvailable() =>
+        GetCpuCycleMeasurementKind() != CpuCycleMeasurementKind.Unsupported;
+
+    internal static bool HasMeaningfulCpuCycles()
+    {
+        return GetCpuCycleMeasurementKind() is CpuCycleMeasurementKind.ThreadCycles
+            or CpuCycleMeasurementKind.PerfEventCpuCycles;
+    }
+
     private static bool InitializeCore()
     {
         try

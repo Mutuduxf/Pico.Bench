@@ -81,6 +81,16 @@ public sealed class HtmlFormatter(FormatterOptions? options = null) : FormatterB
         {
             sb.AppendLine("<div class=\"environment\">");
             sb.AppendLine($"<strong>Environment:</strong> {Escape(suite.Environment.ToString())}");
+            sb.AppendLine("<br>");
+            sb.AppendLine(
+                $"<strong>CPU Counter:</strong> {Escape(EnvironmentInfo.DescribeCpuCycleMeasurement(suite.Environment.CpuCycleMeasurement))}"
+            );
+
+            if (!suite.Environment.CpuCyclesAvailable)
+                sb.AppendLine("<br><strong>CPU Counter Note:</strong> unavailable on this platform/runtime");
+            else if (!suite.Environment.CpuCyclesAreMeaningful)
+                sb.AppendLine("<br><strong>CPU Counter Note:</strong> proxy timing source, not true CPU cycles");
+
             sb.AppendLine("</div>");
         }
 
@@ -346,6 +356,8 @@ footer {
             sb.AppendLine("<th class=\"number\">P90 (ns)</th>");
             sb.AppendLine("<th class=\"number\">P95 (ns)</th>");
             sb.AppendLine("<th class=\"number\">P99 (ns)</th>");
+            sb.AppendLine("<th class=\"number\">StdErr (ns)</th>");
+            sb.AppendLine("<th class=\"number\">RSD (%)</th>");
         }
 
         if (Options.IncludeCpuCycles)
@@ -374,6 +386,8 @@ footer {
                 sb.AppendLine($"<td class=\"number\">{FormatTime(s.P90)}</td>");
                 sb.AppendLine($"<td class=\"number\">{FormatTime(s.P95)}</td>");
                 sb.AppendLine($"<td class=\"number\">{FormatTime(s.P99)}</td>");
+                sb.AppendLine($"<td class=\"number\">{FormatTime(s.StandardError)}</td>");
+                sb.AppendLine($"<td class=\"number\">{s.RelativeStdDevPercent:F1}</td>");
             }
 
             if (Options.IncludeCpuCycles)
@@ -449,6 +463,8 @@ footer {
             sb.AppendLine("<th class=\"number\">P50</th>");
             sb.AppendLine("<th class=\"number\">P90</th>");
             sb.AppendLine("<th class=\"number\">P99</th>");
+            sb.AppendLine("<th class=\"number\">StdErr</th>");
+            sb.AppendLine("<th class=\"number\">RSD (%)</th>");
         }
 
         if (Options.IncludeCpuCycles)
@@ -483,6 +499,8 @@ footer {
                 sb.AppendLine($"<td class=\"number\">{FormatTime(row.Stats.P50)}</td>");
                 sb.AppendLine($"<td class=\"number\">{FormatTime(row.Stats.P90)}</td>");
                 sb.AppendLine($"<td class=\"number\">{FormatTime(row.Stats.P99)}</td>");
+                sb.AppendLine($"<td class=\"number\">{FormatTime(row.Stats.StandardError)}</td>");
+                sb.AppendLine($"<td class=\"number\">{row.Stats.RelativeStdDevPercent:F1}</td>");
             }
 
             if (Options.IncludeCpuCycles)

@@ -61,6 +61,14 @@ public sealed class CsvFormatter(FormatterOptions? options = null) : FormatterBa
             if (!string.IsNullOrEmpty(suite.Description))
                 sb.AppendLine($"# Description: {Escape(suite.Description!)}");
             sb.AppendLine($"# Environment: {Escape(suite.Environment.ToString())}");
+            sb.AppendLine(
+                $"# CpuCounter: {Escape(EnvironmentInfo.DescribeCpuCycleMeasurement(suite.Environment.CpuCycleMeasurement))}"
+            );
+
+            if (!suite.Environment.CpuCyclesAvailable)
+                sb.AppendLine("# CpuCounterNote: unavailable");
+            else if (!suite.Environment.CpuCyclesAreMeaningful)
+                sb.AppendLine("# CpuCounterNote: proxy-only");
         }
 
         if (Options.IncludeTimestamp)
@@ -104,7 +112,18 @@ public sealed class CsvFormatter(FormatterOptions? options = null) : FormatterBa
 
         if (Options.IncludePercentiles)
         {
-            columns.AddRange(["P90_ns", "P95_ns", "P99_ns", "Min_ns", "Max_ns", "StdDev_ns"]);
+            columns.AddRange(
+                [
+                    "P90_ns",
+                    "P95_ns",
+                    "P99_ns",
+                    "Min_ns",
+                    "Max_ns",
+                    "StdDev_ns",
+                    "StdErr_ns",
+                    "RSD_pct"
+                ]
+            );
         }
 
         if (Options.IncludeCpuCycles)
@@ -148,7 +167,9 @@ public sealed class CsvFormatter(FormatterOptions? options = null) : FormatterBa
                     FormatNumber(s.P99),
                     FormatNumber(s.Min),
                     FormatNumber(s.Max),
-                    FormatNumber(s.StdDev)
+                    FormatNumber(s.StdDev),
+                    FormatNumber(s.StandardError),
+                    FormatNumber(s.RelativeStdDevPercent)
                 ]
             );
         }
@@ -191,7 +212,7 @@ public sealed class CsvFormatter(FormatterOptions? options = null) : FormatterBa
 
         if (Options.IncludePercentiles)
         {
-            columns.AddRange(["P50_ns", "P90_ns", "P99_ns"]);
+            columns.AddRange(["P50_ns", "P90_ns", "P99_ns", "StdErr_ns", "RSD_pct"]);
         }
 
         if (Options.IncludeCpuCycles)
@@ -239,7 +260,13 @@ public sealed class CsvFormatter(FormatterOptions? options = null) : FormatterBa
         if (Options.IncludePercentiles)
         {
             values.AddRange(
-                [FormatNumber(stats.P50), FormatNumber(stats.P90), FormatNumber(stats.P99)]
+                [
+                    FormatNumber(stats.P50),
+                    FormatNumber(stats.P90),
+                    FormatNumber(stats.P99),
+                    FormatNumber(stats.StandardError),
+                    FormatNumber(stats.RelativeStdDevPercent)
+                ]
             );
         }
 

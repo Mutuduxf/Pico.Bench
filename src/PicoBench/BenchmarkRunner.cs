@@ -3,7 +3,7 @@ namespace PicoBench;
 /// <summary>
 /// Static helper for running attribute-based benchmarks.
 /// Provides a generic <c>Run&lt;T&gt;</c> entry point that is fully AOT-compatible
-/// because the source generator implements <see cref="IBenchmarkClass"/> on <typeparamref name="T"/>.
+/// because the source generator implements <see cref="IBenchmarkClass"/> on the benchmark type.
 /// </summary>
 public static class BenchmarkRunner
 {

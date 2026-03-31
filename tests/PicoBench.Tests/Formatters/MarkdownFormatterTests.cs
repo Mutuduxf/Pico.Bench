@@ -96,6 +96,7 @@ public class MarkdownFormatterTests
         await Assert.That(markdown).Contains("## Comparisons");
         await Assert.That(markdown).Contains("### Summary");
         await Assert.That(markdown).Contains("```");
+        await Assert.That(markdown).Contains("CPU Counter:");
 
         if (!string.IsNullOrEmpty(suite.Description))
         {
@@ -137,8 +138,9 @@ public class MarkdownFormatterTests
     [Property("Category", "Formatter")]
     [Property("SubCategory", "Markdown")]
     [MethodDataSource(nameof(GetOptionCombinations))]
-    public async Task OptionalColumns_RespectOptions(FormatterOptions options)
+    public async Task OptionalColumns_RespectOptions(Func<FormatterOptions> optionsFactory)
     {
+        var options = optionsFactory();
         var results = BenchmarkResultFactory.CreateMultiple(1).ToList();
         var formatter = new MarkdownFormatter(options);
 
@@ -147,6 +149,8 @@ public class MarkdownFormatterTests
         if (options.IncludePercentiles)
         {
             await Assert.That(markdown).Contains("| P90 (ns) | P95 (ns) | P99 (ns) ");
+            await Assert.That(markdown).Contains("StdErr (ns)");
+            await Assert.That(markdown).Contains("RSD (%)");
         }
         else
         {
@@ -175,10 +179,27 @@ public class MarkdownFormatterTests
     [Test]
     [Property("Category", "Formatter")]
     [Property("SubCategory", "Markdown")]
+    public async Task Format_Results_IncludesPrecisionColumns()
+    {
+        var result = BenchmarkResultFactory.Create(
+            statistics: StatisticsFactory.Create(standardError: 1.5, relativeStdDevPercent: 7.5)
+        );
+        var formatter = new MarkdownFormatter();
+
+        var markdown = formatter.Format(result);
+
+        await Assert.That(markdown).Contains("StdErr (ns)");
+        await Assert.That(markdown).Contains("RSD (%)");
+        await Assert.That(markdown).Contains("1.5");
+        await Assert.That(markdown).Contains("7.5");
+    }
+
+    [Test]
+    [Property("Category", "Formatter")]
+    [Property("SubCategory", "Markdown")]
     [Property("FileSystem", "true")]
     [NotInParallel]
-    [MethodDataSource(nameof(GetDummyTestContext))]
-    public async Task WriteToFile_CreatesValidMarkdownFile(TestContext context)
+    public async Task WriteToFile_CreatesValidMarkdownFile()
     {
         var testDir = FileSystemHelper.CreateTestDirectory();
         try
@@ -194,7 +215,6 @@ public class MarkdownFormatterTests
             await Assert.That(content).Contains("| Name | Avg (ns) | P50 (ns)");
             await Assert.That(content).Contains(result.Name);
 
-            context?.LogFileOperation("WriteToFile Markdown", filePath);
         }
         finally
         {
@@ -333,8 +353,7 @@ public class MarkdownFormatterTests
     [Property("SubCategory", "Markdown")]
     [Property("FileSystem", "true")]
     [NotInParallel]
-    [MethodDataSource(nameof(GetDummyTestContext))]
-    public async Task WriteToFile_Comparisons_CreatesValidMarkdown(TestContext context)
+    public async Task WriteToFile_Comparisons_CreatesValidMarkdown()
     {
         var testDir = FileSystemHelper.CreateTestDirectory();
         try
@@ -350,7 +369,6 @@ public class MarkdownFormatterTests
             await Assert.That(content).Contains("| Test Case |");
             await Assert.That(content).Contains("**"); // Bold speedup
 
-            context?.LogFileOperation("WriteToFile comparisons Markdown", filePath);
         }
         finally
         {
@@ -363,8 +381,7 @@ public class MarkdownFormatterTests
     [Property("SubCategory", "Markdown")]
     [Property("FileSystem", "true")]
     [NotInParallel]
-    [MethodDataSource(nameof(GetDummyTestContext))]
-    public async Task WriteToFile_Suite_CreatesValidMarkdown(TestContext context)
+    public async Task WriteToFile_Suite_CreatesValidMarkdown()
     {
         var testDir = FileSystemHelper.CreateTestDirectory();
         try
@@ -380,7 +397,6 @@ public class MarkdownFormatterTests
             await Assert.That(content).StartsWith($"# {suite.Name}");
             await Assert.That(content).Contains("## Results");
 
-            context?.LogFileOperation("WriteToFile suite Markdown", filePath);
         }
         finally
         {
@@ -407,18 +423,13 @@ public class MarkdownFormatterTests
         );
     }
 
-    public static IEnumerable<FormatterOptions> GetOptionCombinations()
+    public static IEnumerable<Func<FormatterOptions>> GetOptionCombinations()
     {
-        yield return FormatterOptions.Default;
-        yield return FormatterOptions.Compact;
-        yield return FormatterOptions.Minimal;
-        yield return new FormatterOptions { IncludePercentiles = false };
-        yield return new FormatterOptions { IncludeCpuCycles = false };
-        yield return new FormatterOptions { IncludeGcInfo = false };
-    }
-
-    public static IEnumerable<TestContext> GetDummyTestContext()
-    {
-        yield return null!;
+        yield return () => FormatterOptions.Default;
+        yield return () => FormatterOptions.Compact;
+        yield return () => FormatterOptions.Minimal;
+        yield return () => new FormatterOptions { IncludePercentiles = false };
+        yield return () => new FormatterOptions { IncludeCpuCycles = false };
+        yield return () => new FormatterOptions { IncludeGcInfo = false };
     }
 }

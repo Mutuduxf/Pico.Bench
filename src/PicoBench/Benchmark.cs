@@ -57,7 +57,7 @@ public static class Benchmark
         return CollectAndBuild(
             name,
             config,
-            () => Runner.Time(config.IterationsPerSample, action, setup, teardown)
+            iterations => Runner.Time(iterations, action, setup, teardown)
         );
     }
 
@@ -94,7 +94,7 @@ public static class Benchmark
         return CollectAndBuild(
             name,
             config,
-            () => Runner.Time(config.IterationsPerSample, state, action)
+            iterations => Runner.Time(iterations, state, action)
         );
     }
 
@@ -130,10 +130,10 @@ public static class Benchmark
         return CollectAndBuild(
             name,
             config,
-            () =>
+            iterations =>
             {
                 using var scope = scopeFactory();
-                return Runner.Time(config.IterationsPerSample, scope, action);
+                return Runner.Time(iterations, scope, action);
             }
         );
     }
@@ -204,10 +204,12 @@ public static class Benchmark
     private static BenchmarkResult CollectAndBuild(
         string name,
         BenchmarkConfig config,
-        Func<TimingSample> sampleFunc
+        Func<int, TimingSample> sampleFunc
     )
     {
         ForceGc();
+
+        var iterationsPerSample = ResolveIterationsPerSample(config, sampleFunc);
 
         var samples = new TimingSample[config.SampleCount];
         var perOpTimes = new double[config.SampleCount];
@@ -215,10 +217,10 @@ public static class Benchmark
 
         for (var s = 0; s < config.SampleCount; s++)
         {
-            var sample = sampleFunc();
+            var sample = sampleFunc(iterationsPerSample);
             samples[s] = sample;
-            perOpTimes[s] = sample.ElapsedNanoseconds / config.IterationsPerSample;
-            perOpCycles[s] = (double)sample.CpuCycles / config.IterationsPerSample;
+            perOpTimes[s] = sample.ElapsedNanoseconds / iterationsPerSample;
+            perOpCycles[s] = (double)sample.CpuCycles / iterationsPerSample;
         }
 
         var stats = StatisticsCalculator.Compute(perOpTimes, perOpCycles, samples);
@@ -226,10 +228,41 @@ public static class Benchmark
         return new BenchmarkResult(
             name: name,
             statistics: stats,
-            iterationsPerSample: config.IterationsPerSample,
+            iterationsPerSample: iterationsPerSample,
             sampleCount: config.SampleCount,
             samples: config.RetainSamples ? samples : null
         );
+    }
+
+    private static int ResolveIterationsPerSample(
+        BenchmarkConfig config,
+        Func<int, TimingSample> sampleFunc
+    )
+    {
+        if (!config.AutoCalibrateIterations)
+            return config.IterationsPerSample;
+
+        var iterations = config.IterationsPerSample;
+        var minSampleNanoseconds = Math.Max(config.MinSampleTime.TotalMilliseconds * 1_000_000.0, 1.0);
+
+        while (iterations < config.MaxAutoIterationsPerSample)
+        {
+            var sample = sampleFunc(iterations);
+            if (sample.ElapsedNanoseconds >= minSampleNanoseconds)
+                return iterations;
+
+            var scale = minSampleNanoseconds / Math.Max(sample.ElapsedNanoseconds, 1.0);
+            var nextIterations = (int)Math.Min(
+                config.MaxAutoIterationsPerSample,
+                Math.Max(iterations + 1, Math.Ceiling(iterations * Math.Min(Math.Max(scale, 2.0), 10.0)))
+            );
+
+            if (nextIterations <= iterations)
+                break;
+            iterations = nextIterations;
+        }
+
+        return iterations;
     }
 
     #endregion

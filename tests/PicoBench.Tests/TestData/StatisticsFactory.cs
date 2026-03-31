@@ -14,10 +14,15 @@ public static class StatisticsFactory
         double min = 120.0,
         double max = 200.0,
         double stdDev = 20.0,
+        double? standardError = null,
+        double? relativeStdDevPercent = null,
         double cpuCyclesPerOp = 300.0,
         GcInfo? gcInfo = null
     )
     {
+        var computedStandardError = standardError ?? (stdDev / Math.Sqrt(5));
+        var computedRelativeStdDev = relativeStdDevPercent ?? (Math.Abs(avg) < 1e-12 ? 0.0 : (stdDev / Math.Abs(avg)) * 100.0);
+
         return new Statistics
         {
             Avg = avg,
@@ -28,6 +33,8 @@ public static class StatisticsFactory
             Min = min,
             Max = max,
             StdDev = stdDev,
+            StandardError = computedStandardError,
+            RelativeStdDevPercent = computedRelativeStdDev,
             CpuCyclesPerOp = cpuCyclesPerOp,
             GcInfo = gcInfo ?? GcInfoFactory.Create()
         };
@@ -85,6 +92,8 @@ public static class StatisticsFactory
             Min = stats.Min,
             Max = stats.Max,
             StdDev = stats.StdDev,
+            StandardError = stats.StandardError,
+            RelativeStdDevPercent = stats.RelativeStdDevPercent,
             CpuCyclesPerOp = 0.0,
             GcInfo = stats.GcInfo
         };

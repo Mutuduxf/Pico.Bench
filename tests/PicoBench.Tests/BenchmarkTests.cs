@@ -34,6 +34,17 @@ public class BenchmarkTests
             RetainSamples = true
         };
 
+    private static readonly BenchmarkConfig AutoCalibratedConfig =
+        new()
+        {
+            WarmupIterations = 0,
+            SampleCount = 2,
+            IterationsPerSample = 1,
+            AutoCalibrateIterations = true,
+            MinSampleTime = TimeSpan.FromMilliseconds(1),
+            MaxAutoIterationsPerSample = 1_000_000
+        };
+
     // ─── Run(string, Action, BenchmarkConfig?) ──────────────────────
 
     [Test]
@@ -202,6 +213,34 @@ public class BenchmarkTests
         await Assert.That(result.Statistics.Avg).IsGreaterThanOrEqualTo(0);
         await Assert.That(result.Statistics.Min).IsGreaterThanOrEqualTo(0);
         await Assert.That(result.Statistics.Max).IsGreaterThanOrEqualTo(result.Statistics.Min);
+    }
+
+    [Test]
+    [Property("Category", "Benchmark")]
+    public async Task Run_AutoCalibrateIterations_IncreasesIterationsForFastWork()
+    {
+        var result = Benchmark.Run("AutoCalibrated", () => { }, AutoCalibratedConfig);
+
+        await Assert.That(result.IterationsPerSample).IsGreaterThan(1);
+    }
+
+    [Test]
+    [Property("Category", "Benchmark")]
+    public async Task Run_AutoCalibrateIterations_RespectsMaxIterations()
+    {
+        var config = new BenchmarkConfig
+        {
+            WarmupIterations = 0,
+            SampleCount = 1,
+            IterationsPerSample = 1,
+            AutoCalibrateIterations = true,
+            MinSampleTime = TimeSpan.FromSeconds(1),
+            MaxAutoIterationsPerSample = 128
+        };
+
+        var result = Benchmark.Run("AutoCalibratedMax", () => { }, config);
+
+        await Assert.That(result.IterationsPerSample).IsLessThanOrEqualTo(128);
     }
 
     // ─── Run<TState>(...) — generic state overload ──────────────────

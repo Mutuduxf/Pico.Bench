@@ -99,15 +99,19 @@ public sealed class FormatterOptions
 
 /// <summary>
 /// Base class for formatters with common helper methods.
-/// Uses the Template Method pattern: public <see cref="Format"/> methods validate
+/// Uses the Template Method pattern: public <see cref="Format(BenchmarkResult)"/> methods validate
 /// inputs and delegate to <c>FormatCore</c> overrides in derived classes.
 /// </summary>
 public abstract class FormatterBase(FormatterOptions? options = null) : IFormatter
 {
+    /// <summary>Resolved formatter options for this formatter instance.</summary>
     protected FormatterOptions Options { get; } = options ?? FormatterOptions.Default;
 
     #region IFormatter — public entry points with null validation
 
+    /// <summary>
+    /// Format a single benchmark result.
+    /// </summary>
     public string Format(BenchmarkResult result)
     {
         return result == null
@@ -115,6 +119,9 @@ public abstract class FormatterBase(FormatterOptions? options = null) : IFormatt
             : FormatCore(result);
     }
 
+    /// <summary>
+    /// Format a sequence of benchmark results.
+    /// </summary>
     public string Format(IEnumerable<BenchmarkResult> results)
     {
         return results == null
@@ -122,6 +129,9 @@ public abstract class FormatterBase(FormatterOptions? options = null) : IFormatt
             : FormatCore(results);
     }
 
+    /// <summary>
+    /// Format a single comparison result.
+    /// </summary>
     public string Format(ComparisonResult comparison)
     {
         return comparison == null
@@ -129,6 +139,9 @@ public abstract class FormatterBase(FormatterOptions? options = null) : IFormatt
             : FormatCore(comparison);
     }
 
+    /// <summary>
+    /// Format a sequence of comparison results.
+    /// </summary>
     public string Format(IEnumerable<ComparisonResult> comparisons)
     {
         return comparisons == null
@@ -136,6 +149,9 @@ public abstract class FormatterBase(FormatterOptions? options = null) : IFormatt
             : FormatCore(comparisons);
     }
 
+    /// <summary>
+    /// Format a benchmark suite.
+    /// </summary>
     public string Format(BenchmarkSuite suite)
     {
         return suite == null ? throw new ArgumentNullException(nameof(suite)) : FormatCore(suite);
@@ -151,6 +167,9 @@ public abstract class FormatterBase(FormatterOptions? options = null) : IFormatt
     /// </summary>
     protected virtual string FormatCore(BenchmarkResult result) => FormatCore(new[] { result });
 
+    /// <summary>
+    /// Format a sequence of benchmark results.
+    /// </summary>
     protected abstract string FormatCore(IEnumerable<BenchmarkResult> results);
 
     /// <summary>
@@ -160,22 +179,38 @@ public abstract class FormatterBase(FormatterOptions? options = null) : IFormatt
     protected virtual string FormatCore(ComparisonResult comparison) =>
         FormatCore(new[] { comparison });
 
+    /// <summary>
+    /// Format a sequence of comparison results.
+    /// </summary>
     protected abstract string FormatCore(IEnumerable<ComparisonResult> comparisons);
+
+    /// <summary>
+    /// Format a full benchmark suite.
+    /// </summary>
     protected abstract string FormatCore(BenchmarkSuite suite);
 
     #endregion
 
+    /// <summary>
+    /// Format a nanosecond value using the configured precision.
+    /// </summary>
     protected string FormatTime(double nanoseconds)
     {
         return nanoseconds.ToString($"F{Options.TimeDecimalPlaces}", CultureInfo.InvariantCulture);
     }
 
+    /// <summary>
+    /// Format a speedup ratio using the configured precision.
+    /// </summary>
     protected string FormatSpeedup(double speedup)
     {
         return speedup.ToString($"F{Options.SpeedupDecimalPlaces}", CultureInfo.InvariantCulture)
             + "x";
     }
 
+    /// <summary>
+    /// Format GC generation counts as <c>gen0/gen1/gen2</c>.
+    /// </summary>
     protected static string FormatGcInfo(GcInfo gc)
     {
         return $"{gc.Gen0}/{gc.Gen1}/{gc.Gen2}";

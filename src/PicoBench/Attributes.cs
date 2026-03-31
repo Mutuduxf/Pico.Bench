@@ -48,14 +48,16 @@ public sealed class GlobalCleanupAttribute : Attribute { }
 
 /// <summary>
 /// Marks a method to be called before each sample iteration (not timed).
-/// Corresponds to the <c>setup</c> parameter of <see cref="Benchmark.Run"/>.
+/// Corresponds to the <c>setup</c> parameter of
+/// <see cref="Benchmark.Run(string, Action, Action?, BenchmarkConfig?, Action?, Action?)"/>.
 /// </summary>
 [AttributeUsage(AttributeTargets.Method, Inherited = false, AllowMultiple = false)]
 public sealed class IterationSetupAttribute : Attribute { }
 
 /// <summary>
 /// Marks a method to be called after each sample iteration (not timed).
-/// Corresponds to the <c>teardown</c> parameter of <see cref="Benchmark.Run"/>.
+/// Corresponds to the <c>teardown</c> parameter of
+/// <see cref="Benchmark.Run(string, Action, Action?, BenchmarkConfig?, Action?, Action?)"/>.
 /// </summary>
 [AttributeUsage(AttributeTargets.Method, Inherited = false, AllowMultiple = false)]
 public sealed class IterationCleanupAttribute : Attribute { }

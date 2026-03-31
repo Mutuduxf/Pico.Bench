@@ -53,6 +53,16 @@ public sealed class MarkdownFormatter(FormatterOptions? options = null) : Format
             sb.AppendLine();
             sb.AppendLine($"**{suite.Environment}**");
             sb.AppendLine();
+            sb.AppendLine(
+                $"- CPU Counter: `{EnvironmentInfo.DescribeCpuCycleMeasurement(suite.Environment.CpuCycleMeasurement)}`"
+            );
+
+            if (!suite.Environment.CpuCyclesAvailable)
+                sb.AppendLine("- CPU Counter Note: unavailable on this platform/runtime");
+            else if (!suite.Environment.CpuCyclesAreMeaningful)
+                sb.AppendLine("- CPU Counter Note: proxy timing source, not true CPU cycles");
+
+            sb.AppendLine();
         }
 
         if (Options.IncludeTimestamp)
@@ -104,7 +114,7 @@ public sealed class MarkdownFormatter(FormatterOptions? options = null) : Format
         // Header
         sb.Append("| Name | Avg (ns) | P50 (ns) ");
         if (Options.IncludePercentiles)
-            sb.Append("| P90 (ns) | P95 (ns) | P99 (ns) ");
+            sb.Append("| P90 (ns) | P95 (ns) | P99 (ns) | StdErr (ns) | RSD (%) ");
         if (Options.IncludeCpuCycles)
             sb.Append("| CPU Cycle ");
         if (Options.IncludeGcInfo)
@@ -114,7 +124,7 @@ public sealed class MarkdownFormatter(FormatterOptions? options = null) : Format
         // Separator
         sb.Append("|------|----------|----------");
         if (Options.IncludePercentiles)
-            sb.Append("|----------|----------|----------");
+            sb.Append("|----------|----------|----------|-------------|---------");
         if (Options.IncludeCpuCycles)
             sb.Append("|----------");
         if (Options.IncludeGcInfo)
@@ -127,7 +137,9 @@ public sealed class MarkdownFormatter(FormatterOptions? options = null) : Format
             var s = result.Statistics;
             sb.Append($"| {Escape(result.Name)} | {FormatTime(s.Avg)} | {FormatTime(s.P50)} ");
             if (Options.IncludePercentiles)
-                sb.Append($"| {FormatTime(s.P90)} | {FormatTime(s.P95)} | {FormatTime(s.P99)} ");
+                sb.Append(
+                    $"| {FormatTime(s.P90)} | {FormatTime(s.P95)} | {FormatTime(s.P99)} | {FormatTime(s.StandardError)} | {s.RelativeStdDevPercent:F1} "
+                );
             if (Options.IncludeCpuCycles)
                 sb.Append($"| {s.CpuCyclesPerOp:F0} ");
             if (Options.IncludeGcInfo)
@@ -161,7 +173,7 @@ public sealed class MarkdownFormatter(FormatterOptions? options = null) : Format
         // Header
         sb.Append("| Test Case | Avg (ns) | Speedup |");
         if (Options.IncludePercentiles)
-            sb.Append(" P50 | P90 | P99 |");
+            sb.Append(" P50 | P90 | P99 | StdErr | RSD (%) |");
         if (Options.IncludeCpuCycles)
             sb.Append(" CPU |");
         if (Options.IncludeGcInfo)
@@ -171,7 +183,7 @@ public sealed class MarkdownFormatter(FormatterOptions? options = null) : Format
         // Separator
         sb.Append("|-----------|----------|---------|");
         if (Options.IncludePercentiles)
-            sb.Append("-----|-----|-----|");
+            sb.Append("-----|-----|-----|--------|---------|");
         if (Options.IncludeCpuCycles)
             sb.Append("-----|");
         if (Options.IncludeGcInfo)
@@ -191,6 +203,8 @@ public sealed class MarkdownFormatter(FormatterOptions? options = null) : Format
                 sb.Append($" {FormatTime(row.Stats.P50)} |");
                 sb.Append($" {FormatTime(row.Stats.P90)} |");
                 sb.Append($" {FormatTime(row.Stats.P99)} |");
+                sb.Append($" {FormatTime(row.Stats.StandardError)} |");
+                sb.Append($" {row.Stats.RelativeStdDevPercent:F1} |");
             }
 
             if (Options.IncludeCpuCycles)
