@@ -64,9 +64,8 @@ public class ConsoleFormatterTests
     [Property("Category", "Formatter")]
     [Property("SubCategory", "Console")]
     [MethodDataSource(nameof(GetOptionCombinations))]
-    public async Task OptionalColumns_RespectOptions(Func<FormatterOptions> optionsFactory)
+    public async Task OptionalColumns_RespectOptions(FormatterOptions options)
     {
-        var options = optionsFactory();
         var results = BenchmarkResultFactory.CreateMultiple(2).ToList();
         var formatter = new ConsoleFormatter(options);
 
@@ -367,16 +366,16 @@ public class ConsoleFormatterTests
         );
     }
 
-    public static IEnumerable<Func<FormatterOptions>> GetOptionCombinations()
+    public static IEnumerable<FormatterOptions> GetOptionCombinations()
     {
-        yield return () => FormatterOptions.Default;
-        yield return () => FormatterOptions.Compact;
-        yield return () => FormatterOptions.Minimal;
+        yield return FormatterOptions.Default;
+        yield return FormatterOptions.Compact;
+        yield return FormatterOptions.Minimal;
 
         // Custom combinations
-        yield return () => new FormatterOptions { IncludePercentiles = false, IncludeCpuCycles = true };
-        yield return () => new FormatterOptions { IncludePercentiles = true, IncludeCpuCycles = false };
-        yield return () => new FormatterOptions { IncludeGcInfo = false, IncludeEnvironment = false };
+        yield return new FormatterOptions { IncludePercentiles = false, IncludeCpuCycles = true };
+        yield return new FormatterOptions { IncludePercentiles = true, IncludeCpuCycles = false };
+        yield return new FormatterOptions { IncludeGcInfo = false, IncludeEnvironment = false };
     }
 
     public static IEnumerable<BenchmarkResult> GetEdgeCaseResults()

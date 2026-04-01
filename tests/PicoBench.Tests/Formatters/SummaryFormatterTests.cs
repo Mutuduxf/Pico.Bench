@@ -250,10 +250,9 @@ public class SummaryFormatterTests
     [Property("SubCategory", "Summary")]
     [MethodDataSource(nameof(GetEdgeCaseComparisons))]
     public async Task Format_WithEdgeCaseComparisons_DoesNotThrow(
-        Func<IEnumerable<ComparisonResult>> comparisonsFactory
+        IEnumerable<ComparisonResult> comparisons
     )
     {
-        var comparisons = comparisonsFactory();
         var summary = SummaryFormatter.Format(comparisons);
 
         await Assert.That(summary).IsNotNull();
@@ -347,15 +346,15 @@ public class SummaryFormatterTests
         }
     }
 
-    public static IEnumerable<Func<IEnumerable<ComparisonResult>>> GetEdgeCaseComparisons()
+    public static IEnumerable<IEnumerable<ComparisonResult>> GetEdgeCaseComparisons()
     {
-        yield return () => ComparisonResultFactory.GetEdgeCases().ToList();
-        yield return () => new List<ComparisonResult> { ComparisonResultFactory.WithHighSpeedup() };
-        yield return () => new List<ComparisonResult> { ComparisonResultFactory.WithSlowCandidate() };
-        yield return () => new List<ComparisonResult>
+        yield return ComparisonResultFactory.GetEdgeCases().ToList();
+        yield return new List<ComparisonResult> { ComparisonResultFactory.WithHighSpeedup() };
+        yield return new List<ComparisonResult> { ComparisonResultFactory.WithSlowCandidate() };
+        yield return new List<ComparisonResult>
         {
             ComparisonResultFactory.WithNearZeroCandidateTime()
         };
-        yield return () => new List<ComparisonResult> { ComparisonResultFactory.WithBothNearZeroTimes() };
+        yield return new List<ComparisonResult> { ComparisonResultFactory.WithBothNearZeroTimes() };
     }
 }

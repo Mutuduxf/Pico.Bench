@@ -143,9 +143,8 @@ public class HtmlFormatterTests
     [Property("Category", "Formatter")]
     [Property("SubCategory", "HTML")]
     [MethodDataSource(nameof(GetOptionCombinations))]
-    public async Task OptionalSections_RespectOptions(Func<FormatterOptions> optionsFactory)
+    public async Task OptionalSections_RespectOptions(FormatterOptions options)
     {
-        var options = optionsFactory();
         var suite = BenchmarkSuiteFactory.Create();
         var formatter = new HtmlFormatter(options);
 
@@ -412,12 +411,12 @@ public class HtmlFormatterTests
         yield return ("Mixed < & > \" '", "&amp;");
     }
 
-    public static IEnumerable<Func<FormatterOptions>> GetOptionCombinations()
+    public static IEnumerable<FormatterOptions> GetOptionCombinations()
     {
-        yield return () => FormatterOptions.Default;
-        yield return () => FormatterOptions.Compact;
-        yield return () => FormatterOptions.Minimal;
-        yield return () => new FormatterOptions { IncludeEnvironment = false };
-        yield return () => new FormatterOptions { IncludeTimestamp = false };
+        yield return FormatterOptions.Default;
+        yield return FormatterOptions.Compact;
+        yield return FormatterOptions.Minimal;
+        yield return new FormatterOptions { IncludeEnvironment = false };
+        yield return new FormatterOptions { IncludeTimestamp = false };
     }
 }

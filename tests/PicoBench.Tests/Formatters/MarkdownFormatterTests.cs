@@ -138,9 +138,8 @@ public class MarkdownFormatterTests
     [Property("Category", "Formatter")]
     [Property("SubCategory", "Markdown")]
     [MethodDataSource(nameof(GetOptionCombinations))]
-    public async Task OptionalColumns_RespectOptions(Func<FormatterOptions> optionsFactory)
+    public async Task OptionalColumns_RespectOptions(FormatterOptions options)
     {
-        var options = optionsFactory();
         var results = BenchmarkResultFactory.CreateMultiple(1).ToList();
         var formatter = new MarkdownFormatter(options);
 
@@ -423,13 +422,13 @@ public class MarkdownFormatterTests
         );
     }
 
-    public static IEnumerable<Func<FormatterOptions>> GetOptionCombinations()
+    public static IEnumerable<FormatterOptions> GetOptionCombinations()
     {
-        yield return () => FormatterOptions.Default;
-        yield return () => FormatterOptions.Compact;
-        yield return () => FormatterOptions.Minimal;
-        yield return () => new FormatterOptions { IncludePercentiles = false };
-        yield return () => new FormatterOptions { IncludeCpuCycles = false };
-        yield return () => new FormatterOptions { IncludeGcInfo = false };
+        yield return FormatterOptions.Default;
+        yield return FormatterOptions.Compact;
+        yield return FormatterOptions.Minimal;
+        yield return new FormatterOptions { IncludePercentiles = false };
+        yield return new FormatterOptions { IncludeCpuCycles = false };
+        yield return new FormatterOptions { IncludeGcInfo = false };
     }
 }
