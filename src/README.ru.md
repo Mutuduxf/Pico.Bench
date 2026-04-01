@@ -16,10 +16,10 @@
 | `BenchmarkRunner.cs` | Точка входа на основе атрибутов - `Run<T>()` |
 | `Attributes.cs` | Семь атрибутов: `[BenchmarkClass]`, `[Benchmark]`, `[Params]`, `[GlobalSetup]`, `[GlobalCleanup]`, `[IterationSetup]`, `[IterationCleanup]` |
 | `IBenchmarkClass.cs` | Интерфейс, реализуемый генератором исходного кода в декорированных классах |
-| `BenchmarkConfig.cs` | Конфигурация с предустановками Quick / Default / Precise |
+| `BenchmarkConfig.cs` | Конфигурация с предустановками Quick / Default / Precise и опциональной автокалибровкой |
 | `Runner.cs` | Низкоуровневый движок измерения времени с подсчетом циклов CPU для конкретной платформы |
 | `StatisticsCalculator.cs` | Вычисление процентилей и статистики |
-| `Models.cs` | Типы результатов: `BenchmarkResult`, `ComparisonResult`, `BenchmarkSuite`, `Statistics`, `TimingSample`, `GcInfo`, `EnvironmentInfo` |
+| `Models.cs` | Типы результатов, включая поля точности в `Statistics` и метаданные счетчика CPU в `EnvironmentInfo` |
 | `Formatters/` | Пять форматтеров: Console, Markdown, HTML, CSV, Summary |
 
 ### Упаковка
@@ -41,7 +41,7 @@ dotnet add reference ../PicoBench.Generators/PicoBench.Generators.csproj
 **Инкрементальный генератор исходного кода** (`IIncrementalGenerator`), который превращает декорированные `[BenchmarkClass]` partial-классы в полные реализации `IBenchmarkClass` во время компиляции.
 
 - **Цель**: netstandard2.0
-- **Зависимость**: Microsoft.CodeAnalysis.CSharp 4.3.1
+- **Зависимость**: Microsoft.CodeAnalysis.CSharp 5.0.0
 - **Вывод**: Совместимый с AOT C# с вызовами, квалифицированными `global::`, без рефлексии
 
 ### Ключевые файлы
@@ -49,8 +49,11 @@ dotnet add reference ../PicoBench.Generators/PicoBench.Generators.csproj
 | Файл | Назначение |
 |------|---------|
 | `BenchmarkGenerator.cs` | Точка входа генератора, использующая `ForAttributeWithMetadataName` |
+| `DiagnosticDescriptors.cs` | Централизованные диагностики генератора для некорректных объявлений benchmark |
 | `Emitter.cs` | Генератор кода C# - создает `RunBenchmarks()` с итерацией параметров, хуками настройки/очистки и логикой сравнения |
 | `Models.cs` | Модели анализа Roslyn: `BenchmarkClassModel`, `BenchmarkMethodModel`, `ParamsPropertyModel` (все `IEquatable<T>` для кэширования) |
+
+Теперь генератор проверяет типичные ошибки до генерации кода и сообщает диагностику для некорректных benchmark-методов, lifecycle-методов, дублирующихся baseline, некорректных целей `[Params]` и несовместимых значений параметров.
 
 ### Сгенерированный код
 

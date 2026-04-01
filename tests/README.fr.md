@@ -4,7 +4,7 @@
 
 Tests unitaires pour **PicoBench** utilisant le framework de test [TUnit](https://github.com/thomhurst/TUnit).
 
-**Total : 313 tests**
+**Total : 454 tests**
 
 ## Exécution
 
@@ -53,6 +53,17 @@ Tests pour les cinq formateurs de sortie et leur infrastructure de support.
 |------|-------|-------------|
 | `EmitterTests.cs` | 25 | Émission de code du générateur de source : structure de classe, itération des paramètres, crochets de configuration/nettoyage, comparaisons de base, qualification `global::` |
 | `ModelsTests.cs` | 22 | Égalité de `BenchmarkClassModel`, `BenchmarkMethodModel`, `ParamsPropertyModel`, codes de hachage, cas limites |
+| `BenchmarkGeneratorDiagnosticsTests.cs` | 10+ | Diagnostics end-to-end du générateur pour signatures invalides, baselines dupliquées, `[Params]` invalides et émission de paramètres enum |
+
+### Couverture du runtime principal
+
+| Fichier | Tests | Description |
+|------|-------|-------------|
+| `BenchmarkTests.cs` | 40+ | API impérative, exécution scoped, échantillons conservés, comparaisons et comportement d'auto-calibrage |
+| `StatisticsCalculatorTests.cs` | 10+ | Calcul statistique incluant erreur standard, cycles CPU et cas limites |
+| `ModelsTests.cs` | 40+ | Validation du modèle de résultat, métadonnées du compteur CPU et aides de variance |
+
+Les tests des formateurs couvrent désormais aussi des sorties orientées précision comme l'erreur standard, l'écart-type relatif et les notes de compteur CPU dans Console, Markdown, HTML et CSV.
 
 ### TestData/
 

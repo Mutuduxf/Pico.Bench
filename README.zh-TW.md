@@ -13,11 +13,11 @@
 - **高精度計時** - 使用 `Stopwatch`，奈秒級精度
 - **GC 追蹤** - 監控基準測試期間的 Gen0/Gen1/Gen2 回收計數
 - **CPU 週期計數** - 硬體級週期計數（Windows 通過 `QueryThreadCycleTime`，Linux 通過 `perf_event`，macOS 通過 `mach_absolute_time`）
-- **統計分析** - 均值、中位數、P90、P95、P99、最小值、最大值、標準差
+- **統計分析** - 均值、中位數、P90、P95、P99、最小值、最大值、標準差、標準誤和相對波動
 - **多種輸出格式** - 控制台、Markdown、HTML、CSV 和程式化摘要
 - **參數化基準測試** - `[Params]` 屬性，支援自動笛卡爾積迭代
 - **比較支援** - 基準 vs 候選實現，帶加速比計算
-- **可配置** - Quick、Default 和 Precise 預設或完全自訂配置
+- **可配置** - Quick、Default 和 Precise 預設、自動校準或完全自訂配置
 - **netstandard2.0** - 相容 .NET Framework 4.6.1+、.NET Core 2.0+、.NET 5+
 
 ## 安裝
@@ -63,6 +63,8 @@ public partial class MyBenchmarks
 ```
 
 > 類 **必須** 是 `partial`。源生成器在編譯時生成 `IBenchmarkClass` 實現 - 無反射，完全 AOT 安全。
+
+> 常見錯誤用法現在會得到源生成器診斷，例如非 `partial` 類、重複 baseline、非法生命週期方法簽名，以及不相容的 `[Params]` 值。
 
 ---
 
@@ -142,6 +144,8 @@ var result = Benchmark.Run(
 | `[IterationSetup]` | 方法 | 每個樣本**前呼叫**（不計時）。 |
 | `[IterationCleanup]` | 方法 | 每個樣本**後呼叫**（不計時）。 |
 
+`[Benchmark]` 方法必須是實例、非泛型、無參數方法。生命週期方法必須是實例、非泛型、無參數且返回 `void`。`[Params]` 目標必須是可寫實例屬性或非唯讀實例欄位。
+
 ### 完整示例
 
 ```csharp
@@ -196,11 +200,11 @@ var suite2 = BenchmarkRunner.Run(instance, BenchmarkConfig.Quick);
 
 ### 預設
 
-| 預設 | 熱身迭代 | 樣本數 | 每次樣本迭代數 | 使用場景 |
-|--------|--------|---------|--------------|----------|
-| `Quick` | 100 | 10 | 1,000 | 快速迭代 / CI |
-| `Default` | 1,000 | 100 | 10,000 | 通用基準測試 |
-| `Precise` | 5,000 | 200 | 50,000 | 最終測量 |
+| 預設 | 熱身迭代 | 樣本數 | 基礎每樣本迭代數 | 自動校準 | 使用場景 |
+|--------|--------|---------|------------------|----------|----------|
+| `Quick` | 100 | 10 | 1,000 | 是 | 快速迭代 / CI |
+| `Default` | 1,000 | 100 | 10,000 | 否 | 通用基準測試 |
+| `Precise` | 5,000 | 200 | 50,000 | 是 | 最終測量 |
 
 ### 自訂配置
 
@@ -210,11 +214,16 @@ var config = new BenchmarkConfig
     WarmupIterations    = 500,
     SampleCount         = 50,
     IterationsPerSample = 5000,
-    RetainSamples       = true   // 保留原始 TimingSample 數據
+    RetainSamples       = true,  // 保留原始 TimingSample 數據
+    AutoCalibrateIterations = true,
+    MinSampleTime       = TimeSpan.FromMilliseconds(0.5),
+    MaxAutoIterationsPerSample = 1_000_000
 };
 
 var result = Benchmark.Run("Test", action, config);
 ```
+
+啟用自動校準後，PicoBench 會自動增加 `IterationsPerSample`，直到達到最小樣本耗時預算，或命中 `MaxAutoIterationsPerSample` 上限。這對極快操作特別有用，可降低計時噪聲影響。
 
 ---
 
@@ -233,6 +242,8 @@ var csv      = new CsvFormatter();         // CSV 用於數據分析
 // 比較摘要的靜態輔助方法：
 Console.WriteLine(SummaryFormatter.Format(suite.Comparisons));
 ```
+
+控制台、Markdown、HTML 和 CSV 輸出現在會包含更偏精度分析的元資料，例如標準誤、相對標準差，以及 CPU 計數器語義說明。
 
 ### 格式化目標
 
@@ -284,10 +295,10 @@ File.WriteAllText(Path.Combine(dir, "results.csv"),  new CsvFormatter().Format(s
 | `BenchmarkResult` | 名稱、統計、樣本、每次樣本迭代數、樣本數、標籤、類別 |
 | `ComparisonResult` | 基準、候選、加速比、是否更快、改進百分比 |
 | `BenchmarkSuite` | 名稱、描述、結果、比較、環境、持續時間 |
-| `Statistics` | 平均值、P50、P90、P95、P99、最小值、最大值、標準差、每操作 CPU 週期、GC 信息 |
+| `Statistics` | 平均值、P50、P90、P95、P99、最小值、最大值、標準差、標準誤、相對標準差百分比、每操作 CPU 週期、GC 信息 |
 | `TimingSample` | 奈秒耗時、毫秒耗時、計時器滴答數、CPU 週期、GC 信息 |
 | `GcInfo` | Gen0、Gen1、Gen2、總計、是否為零 |
-| `EnvironmentInfo` | 操作系統、架構、執行時版本、處理器數量、配置 |
+| `EnvironmentInfo` | 操作系統、架構、執行時版本、處理器數量、配置、CPU 計數器類型/可用性 |
 
 ---
 
@@ -328,6 +339,8 @@ src/
 | GC 追蹤 (Gen0/1/2) | 是 | 是 | 是 |
 | CPU 週期計數 | `QueryThreadCycleTime` | `perf_event_open` | `mach_absolute_time` |
 | 進程優先級提升 | 是 | 是 | 是 |
+
+在 macOS 上，導出的 CPU 計數器是高精度單調時鐘代理值，而不是真正的架構 CPU 週期。`EnvironmentInfo` 和格式化輸出會明確區分這一點。
 
 ---
 

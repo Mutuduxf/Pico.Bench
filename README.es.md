@@ -13,11 +13,11 @@ Una biblioteca de benchmarking ligera y sin dependencias para .NET con **dos API
 - **Cronometría de Alta Precisión** - Utiliza `Stopwatch` con granularidad a nivel de nanosegundos
 - **Seguimiento de GC** - Monitorea los recuentos de recolección Gen0/Gen1/Gen2 durante los benchmarks
 - **Conteo de Ciclos de CPU** - Conteo de ciclos a nivel de hardware (Windows vía `QueryThreadCycleTime`, Linux vía `perf_event`, macOS vía `mach_absolute_time`)
-- **Análisis Estadístico** - Media, Mediana, P90, P95, P99, Mínimo, Máximo, Desviación Estándar
+- **Análisis Estadístico** - Media, Mediana, P90, P95, P99, Mínimo, Máximo, Desviación Estándar, error estándar y varianza relativa
 - **Múltiples Formatos de Salida** - Consola, Markdown, HTML, CSV y resumen programático
 - **Benchmarks Parametrizados** - Atributo `[Params]` con iteración automática de producto cartesiano
 - **Soporte de Comparación** - Línea base vs candidato con cálculos de aceleración
-- **Configurable** - Preajustes Quick, Default y Precise o configuración completamente personalizada
+- **Configurable** - Preajustes Quick, Default y Precise, auto-calibración o configuración completamente personalizada
 - **netstandard2.0** - Compatible con .NET Framework 4.6.1+, .NET Core 2.0+, .NET 5+
 
 ## Instalación
@@ -63,6 +63,8 @@ public partial class MyBenchmarks
 ```
 
 > La clase **debe** ser `partial`. El generador de código fuente emite una implementación `IBenchmarkClass` en tiempo de compilación - sin reflexión, completamente segura para AOT.
+
+> El uso inválido de atributos ahora produce diagnósticos del generador para errores comunes como clases no `partial`, baselines duplicadas, firmas de ciclo de vida no válidas y valores `[Params]` incompatibles.
 
 ---
 
@@ -142,6 +144,8 @@ Decora una clase **partial** con `[BenchmarkClass]` y sus métodos/propiedades c
 | `[IterationSetup]` | Método | Llamado antes de **cada muestra** (no cronometrado). |
 | `[IterationCleanup]` | Método | Llamado después de **cada muestra** (no cronometrado). |
 
+Los métodos `[Benchmark]` deben ser de instancia, no genéricos y sin parámetros. Los métodos de ciclo de vida deben ser de instancia, no genéricos, sin parámetros y `void`. Los destinos de `[Params]` deben ser propiedades de instancia editables o campos de instancia no `readonly`.
+
 ### Ejemplo Completo
 
 ```csharp
@@ -196,11 +200,11 @@ var suite2 = BenchmarkRunner.Run(instance, BenchmarkConfig.Quick);
 
 ### Preajustes
 
-| Preajuste | Calentamiento | Muestras | Iteraciones/Muestra | Caso de Uso |
-|--------|--------|---------|--------------|----------|
-| `Quick` | 100 | 10 | 1,000 | Iteración rápida / CI |
-| `Default` | 1,000 | 100 | 10,000 | Benchmarking general |
-| `Precise` | 5,000 | 200 | 50,000 | Mediciones finales |
+| Preajuste | Calentamiento | Muestras | Iteraciones base/Muestra | Auto-calibración | Caso de Uso |
+|--------|--------|---------|--------------------------|------------------|----------|
+| `Quick` | 100 | 10 | 1,000 | Sí | Iteración rápida / CI |
+| `Default` | 1,000 | 100 | 10,000 | No | Benchmarking general |
+| `Precise` | 5,000 | 200 | 50,000 | Sí | Mediciones finales |
 
 ### Configuración Personalizada
 
@@ -210,11 +214,16 @@ var config = new BenchmarkConfig
     WarmupIterations    = 500,
     SampleCount         = 50,
     IterationsPerSample = 5000,
-    RetainSamples       = true   // Conservar datos brutos de TimingSample
+    RetainSamples       = true,  // Conservar datos brutos de TimingSample
+    AutoCalibrateIterations = true,
+    MinSampleTime       = TimeSpan.FromMilliseconds(0.5),
+    MaxAutoIterationsPerSample = 1_000_000
 };
 
 var result = Benchmark.Run("Test", action, config);
 ```
+
+Cuando la auto-calibración está habilitada, PicoBench incrementa `IterationsPerSample` hasta alcanzar un presupuesto mínimo de tiempo por muestra o hasta llegar a `MaxAutoIterationsPerSample`. Esto es especialmente útil para operaciones ultrarrápidas dominadas por el ruido del temporizador.
 
 ---
 
@@ -233,6 +242,8 @@ var csv      = new CsvFormatter();         // CSV para análisis de datos
 // Ayudante estático para resúmenes de comparación:
 Console.WriteLine(SummaryFormatter.Format(suite.Comparisons));
 ```
+
+Las salidas de Console, Markdown, HTML y CSV ahora incluyen metadatos orientados a la precisión, como error estándar, desviación estándar relativa y notas sobre el contador de CPU cuando están disponibles.
 
 ### Objetivos de Formateo
 
@@ -284,10 +295,10 @@ File.WriteAllText(Path.Combine(dir, "results.csv"),  new CsvFormatter().Format(s
 | `BenchmarkResult` | Nombre, Estadísticas, Muestras, IteracionesPorMuestra, RecuentoDeMuestras, Etiquetas, Categoría |
 | `ComparisonResult` | Línea base, Candidato, Aceleración, EsMásRápido, PorcentajeDeMejora |
 | `BenchmarkSuite` | Nombre, Descripción, Resultados, Comparaciones, Entorno, Duración |
-| `Statistics` | Promedio, P50, P90, P95, P99, Mínimo, Máximo, DesviaciónEstándar, CiclosDeCpuPorOp, GcInfo |
+| `Statistics` | Promedio, P50, P90, P95, P99, Mínimo, Máximo, DesviaciónEstándar, StandardError, RelativeStdDevPercent, CiclosDeCpuPorOp, GcInfo |
 | `TimingSample` | NanosegundosTranscurridos, MilisegundosTranscurridos, TicksTranscurridos, CiclosDeCpu, GcInfo |
 | `GcInfo` | Gen0, Gen1, Gen2, Total, EsCero |
-| `EnvironmentInfo` | SO, Arquitectura, VersiónDelRuntime, RecuentoDeProcesadores, Configuración |
+| `EnvironmentInfo` | SO, Arquitectura, VersiónDelRuntime, RecuentoDeProcesadores, Configuración, tipo/disponibilidad del contador de CPU |
 
 ---
 
@@ -328,6 +339,8 @@ src/
 | Seguimiento de GC (Gen0/1/2) | Sí | Sí | Sí |
 | Conteo de ciclos de CPU | `QueryThreadCycleTime` | `perf_event_open` | `mach_absolute_time` |
 | Aumento de prioridad de proceso | Sí | Sí | Sí |
+
+En macOS, el contador de CPU exportado es un proxy monotónico de alta resolución y no ciclos arquitectónicos reales. `EnvironmentInfo` y la salida de los formateadores muestran esta diferencia explícitamente.
 
 ---
 

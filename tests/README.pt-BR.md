@@ -4,7 +4,7 @@
 
 Testes unitários para **PicoBench** usando o framework de testes [TUnit](https://github.com/thomhurst/TUnit).
 
-**Total: 313 testes**
+**Total: 454 testes**
 
 ## Executando
 
@@ -53,6 +53,17 @@ Testes para todos os cinco formatadores de saída e sua infraestrutura de suport
 |------|-------|-------------|
 | `EmitterTests.cs` | 25 | Emissão de código do gerador de fonte: estrutura de classe, iteração de parâmetros, hooks de setup/teardown, comparações de baseline, qualificação `global::` |
 | `ModelsTests.cs` | 22 | `BenchmarkClassModel`, `BenchmarkMethodModel`, `ParamsPropertyModel` igualdade, códigos hash, casos extremos |
+| `BenchmarkGeneratorDiagnosticsTests.cs` | 10+ | Diagnósticos end-to-end do gerador para assinaturas inválidas, baselines duplicados, `[Params]` inválidos e emissão de parâmetros enum |
+
+### Cobertura do runtime principal
+
+| Arquivo | Testes | Descrição |
+|------|-------|-------------|
+| `BenchmarkTests.cs` | 40+ | API imperativa, execução scoped, amostras retidas, comparações e comportamento de auto-calibração |
+| `StatisticsCalculatorTests.cs` | 10+ | Cálculo estatístico incluindo erro padrão, ciclos de CPU e casos extremos |
+| `ModelsTests.cs` | 40+ | Validação do modelo de resultados, metadados do contador de CPU e auxiliares de variância |
+
+Os testes de formatadores agora também cobrem saídas orientadas à precisão, como erro padrão, desvio padrão relativo e observações do contador de CPU em Console, Markdown, HTML e CSV.
 
 ### TestData/
 

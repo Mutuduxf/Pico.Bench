@@ -16,10 +16,10 @@
 | `BenchmarkRunner.cs` | 属性ベースエントリーポイント - `Run<T>()` |
 | `Attributes.cs` | 7つの属性：`[BenchmarkClass]`、`[Benchmark]`、`[Params]`、`[GlobalSetup]`、`[GlobalCleanup]`、`[IterationSetup]`、`[IterationCleanup]` |
 | `IBenchmarkClass.cs` | ソースジェネレーターが装飾クラスで実装するインターフェース |
-| `BenchmarkConfig.cs` | Quick / Default / Preciseプリセット付き設定 |
+| `BenchmarkConfig.cs` | Quick / Default / Preciseプリセットに加え、オプションの自動キャリブレーションを備えた設定 |
 | `Runner.cs` | プラットフォーム固有のCPUサイクルカウント付き低レベルタイミングエンジン |
 | `StatisticsCalculator.cs` | パーセンタイルと統計計算 |
-| `Models.cs` | 結果タイプ：`BenchmarkResult`、`ComparisonResult`、`BenchmarkSuite`、`Statistics`、`TimingSample`、`GcInfo`、`EnvironmentInfo` |
+| `Models.cs` | `Statistics` の精度フィールドと `EnvironmentInfo` の CPU カウンターメタデータを含む結果タイプ |
 | `Formatters/` | 5つのフォーマッター：Console、Markdown、HTML、CSV、Summary |
 
 ### パッケージング
@@ -41,7 +41,7 @@ dotnet add reference ../PicoBench.Generators/PicoBench.Generators.csproj
 `[BenchmarkClass]`で装飾されたpartialクラスを、コンパイル時に完全な`IBenchmarkClass`実装に変換する**インクリメンタルソースジェネレーター** (`IIncrementalGenerator`)です。
 
 - **ターゲット**：netstandard2.0
-- **依存関係**：Microsoft.CodeAnalysis.CSharp 4.3.1
+- **依存関係**：Microsoft.CodeAnalysis.CSharp 5.0.0
 - **出力**：AOT互換のC#、`global::`修飾呼び出し、リフレクションなし
 
 ### 主要ファイル
@@ -49,8 +49,11 @@ dotnet add reference ../PicoBench.Generators/PicoBench.Generators.csproj
 | ファイル | 目的 |
 |------|---------|
 | `BenchmarkGenerator.cs` | `ForAttributeWithMetadataName`を使用するジェネレーターエントリーポイント |
+| `DiagnosticDescriptors.cs` | 無効なベンチマーク宣言のための集約されたジェネレーター診断定義 |
 | `Emitter.cs` | C#コードエミッター - パラメータ反復、セットアップ/ティアダウンフック、比較ロジックを含む`RunBenchmarks()`を生成 |
 | `Models.cs` | Roslyn分析モデル：`BenchmarkClassModel`、`BenchmarkMethodModel`、`ParamsPropertyModel`（すべてキャッシュ用に`IEquatable<T>`実装） |
+
+ジェネレーターは現在、コード生成前に一般的な誤りを検証し、無効な benchmark メソッド、lifecycle メソッド、重複 baseline、無効な `[Params]` ターゲット、互換性のないパラメーター値に対する診断を報告します。
 
 ### 生成されるコード
 

@@ -13,11 +13,11 @@
 - **高精度タイミング** - ナノ秒レベルの精度で`Stopwatch`を使用
 - **GC追跡** - ベンチマーク中のGen0/Gen1/Gen2コレクション回数を監視
 - **CPUサイクルカウント** - ハードウェアレベルのサイクルカウント（Windowsは`QueryThreadCycleTime`、Linuxは`perf_event`、macOSは`mach_absolute_time`）
-- **統計分析** - 平均、中央値、P90、P95、P99、最小値、最大値、標準偏差
+- **統計分析** - 平均、中央値、P90、P95、P99、最小値、最大値、標準偏差、標準誤差、相対分散
 - **複数出力形式** - コンソール、Markdown、HTML、CSV、プログラム要約
 - **パラメータ化ベンチマーク** - `[Params]`属性で自動デカルト積反復
 - **比較サポート** - ベースライン vs 候補、高速化計算付き
-- **設定可能** - Quick、Default、Preciseプリセットまたは完全カスタム設定
+- **設定可能** - Quick、Default、Preciseプリセット、自動キャリブレーション、または完全カスタム設定
 - **netstandard2.0** - .NET Framework 4.6.1+、.NET Core 2.0+、.NET 5+と互換性
 
 ## インストール
@@ -63,6 +63,8 @@ public partial class MyBenchmarks
 ```
 
 > クラスは`partial`で**なければなりません**。ソースジェネレーターはコンパイル時に`IBenchmarkClass`実装を生成します - リフレクションなし、完全AOT安全。
+
+> 不正な属性の使い方に対しては、非`partial`クラス、重複した baseline、無効なライフサイクルシグネチャ、互換性のない`[Params]`値などの一般的なミスをジェネレーター診断として報告します。
 
 ---
 
@@ -142,6 +144,8 @@ var result = Benchmark.Run(
 | `[IterationSetup]` | メソッド | 各サンプル**前に呼び出し**（計時対象外）。 |
 | `[IterationCleanup]` | メソッド | 各サンプル**後に呼び出し**（計時対象外）。 |
 
+`[Benchmark]`メソッドは、インスタンスメソッドであり、ジェネリックではなく、引数なしでなければなりません。ライフサイクルメソッドは、インスタンスメソッドであり、ジェネリックではなく、引数なしで、戻り値が`void`である必要があります。`[Params]`の対象は書き込み可能なインスタンスプロパティ、または`readonly`でないインスタンスフィールドでなければなりません。
+
 ### 完全な例
 
 ```csharp
@@ -196,11 +200,11 @@ var suite2 = BenchmarkRunner.Run(instance, BenchmarkConfig.Quick);
 
 ### プリセット
 
-| プリセット | ウォームアップ | サンプル数 | サンプルあたり反復数 | 使用例 |
-|--------|--------|---------|--------------|----------|
-| `Quick` | 100 | 10 | 1,000 | 高速反復 / CI |
-| `Default` | 1,000 | 100 | 10,000 | 一般的なベンチマーク |
-| `Precise` | 5,000 | 200 | 50,000 | 最終測定 |
+| プリセット | ウォームアップ | サンプル数 | 基本反復数/サンプル | 自動キャリブレーション | 使用例 |
+|--------|--------|---------|----------------------|------------------------|----------|
+| `Quick` | 100 | 10 | 1,000 | はい | 高速反復 / CI |
+| `Default` | 1,000 | 100 | 10,000 | いいえ | 一般的なベンチマーク |
+| `Precise` | 5,000 | 200 | 50,000 | はい | 最終測定 |
 
 ### カスタム設定
 
@@ -210,11 +214,16 @@ var config = new BenchmarkConfig
     WarmupIterations    = 500,
     SampleCount         = 50,
     IterationsPerSample = 5000,
-    RetainSamples       = true   // 生のTimingSampleデータを保持
+    RetainSamples       = true,  // 生のTimingSampleデータを保持
+    AutoCalibrateIterations = true,
+    MinSampleTime       = TimeSpan.FromMilliseconds(0.5),
+    MaxAutoIterationsPerSample = 1_000_000
 };
 
 var result = Benchmark.Run("Test", action, config);
 ```
+
+自動キャリブレーションを有効にすると、PicoBench は最小サンプル時間の予算に達するか、`MaxAutoIterationsPerSample` に達するまで `IterationsPerSample` を増やします。これは、タイマーノイズの影響を受けやすい極めて高速な処理で特に有効です。
 
 ---
 
@@ -233,6 +242,8 @@ var csv      = new CsvFormatter();         // データ分析用CSV
 // 比較要約の静的ヘルパー：
 Console.WriteLine(SummaryFormatter.Format(suite.Comparisons));
 ```
+
+Console、Markdown、HTML、CSV の出力には、標準誤差、相対標準偏差、利用可能な場合の CPU カウンター注記など、精度指向のメタデータが含まれるようになりました。
 
 ### フォーマット対象
 
@@ -284,10 +295,10 @@ File.WriteAllText(Path.Combine(dir, "results.csv"),  new CsvFormatter().Format(s
 | `BenchmarkResult` | 名前、統計、サンプル、サンプルあたり反復数、サンプル数、タグ、カテゴリ |
 | `ComparisonResult` | ベースライン、候補、高速化、高速かどうか、改善率 |
 | `BenchmarkSuite` | 名前、説明、結果、比較、環境、期間 |
-| `Statistics` | 平均、P50、P90、P95、P99、最小、最大、標準偏差、操作あたりCPUサイクル、GcInfo |
+| `Statistics` | 平均、P50、P90、P95、P99、最小、最大、標準偏差、StandardError、RelativeStdDevPercent、操作あたりCPUサイクル、GcInfo |
 | `TimingSample` | 経過ナノ秒、経過ミリ秒、経過ティック、CPUサイクル、GcInfo |
 | `GcInfo` | Gen0、Gen1、Gen2、合計、ゼロか |
-| `EnvironmentInfo` | OS、アーキテクチャ、ランタイムバージョン、プロセッサ数、設定 |
+| `EnvironmentInfo` | OS、アーキテクチャ、ランタイムバージョン、プロセッサ数、設定、CPUカウンター種別/可用性 |
 
 ---
 
@@ -328,6 +339,8 @@ src/
 | GC追跡 (Gen0/1/2) | はい | はい | はい |
 | CPUサイクルカウント | `QueryThreadCycleTime` | `perf_event_open` | `mach_absolute_time` |
 | プロセス優先度ブースト | はい | はい | はい |
+
+macOS では、出力される CPU カウンターはアーキテクチャ上の実サイクルではなく、高分解能の単調クロックプロキシです。`EnvironmentInfo` と各フォーマッター出力はこの違いを明示します。
 
 ---
 

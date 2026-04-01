@@ -16,10 +16,10 @@
 | `BenchmarkRunner.cs` | 基于属性的入口点 - `Run<T>()` |
 | `Attributes.cs` | 七个属性：`[BenchmarkClass]`、`[Benchmark]`、`[Params]`、`[GlobalSetup]`、`[GlobalCleanup]`、`[IterationSetup]`、`[IterationCleanup]` |
 | `IBenchmarkClass.cs` | 由源生成器在装饰类上实现的接口 |
-| `BenchmarkConfig.cs` | 包含 Quick / Default / Precise 预设的配置 |
+| `BenchmarkConfig.cs` | 包含 Quick / Default / Precise 预设以及可选自动校准的配置 |
 | `Runner.cs` | 底层计时引擎，支持平台特定的 CPU 周期计数 |
 | `StatisticsCalculator.cs` | 百分位数和统计计算 |
-| `Models.cs` | 结果类型：`BenchmarkResult`、`ComparisonResult`、`BenchmarkSuite`、`Statistics`、`TimingSample`、`GcInfo`、`EnvironmentInfo` |
+| `Models.cs` | 结果类型，包括 `Statistics` 的精度字段以及 `EnvironmentInfo` 中的 CPU 计数器元数据 |
 | `Formatters/` | 五个格式化器：Console、Markdown、HTML、CSV、Summary |
 
 ### 打包
@@ -41,7 +41,7 @@ dotnet add reference ../PicoBench.Generators/PicoBench.Generators.csproj
 一个**增量源生成器** (`IIncrementalGenerator`)，将用 `[BenchmarkClass]` 装饰的 partial 类在编译时转换为完整的 `IBenchmarkClass` 实现。
 
 - **目标**：netstandard2.0
-- **依赖**：Microsoft.CodeAnalysis.CSharp 4.3.1
+- **依赖**：Microsoft.CodeAnalysis.CSharp 5.0.0
 - **输出**：AOT 兼容的 C#，使用 `global::` 限定调用，无反射
 
 ### 关键文件
@@ -49,8 +49,11 @@ dotnet add reference ../PicoBench.Generators/PicoBench.Generators.csproj
 | 文件 | 用途 |
 |------|---------|
 | `BenchmarkGenerator.cs` | 生成器入口点，使用 `ForAttributeWithMetadataName` |
+| `DiagnosticDescriptors.cs` | 集中的生成器诊断定义，用于无效基准声明 |
 | `Emitter.cs` | C# 代码发射器 - 生成 `RunBenchmarks()`，包含参数迭代、设置/清理钩子和比较逻辑 |
 | `Models.cs` | Roslyn 分析模型：`BenchmarkClassModel`、`BenchmarkMethodModel`、`ParamsPropertyModel`（全部实现 `IEquatable<T>` 以支持缓存） |
+
+生成器现在会在发射代码之前验证常见错误，并对非法 benchmark 方法、生命周期方法、重复 baseline、非法 `[Params]` 目标以及不兼容参数值给出诊断。
 
 ### 生成的代码
 

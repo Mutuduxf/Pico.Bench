@@ -4,7 +4,7 @@
 
 **PicoBench** 的單元測試，使用 [TUnit](https://github.com/thomhurst/TUnit) 測試框架。
 
-**總計：313 個測試**
+**總計：454 個測試**
 
 ## 運行
 
@@ -53,6 +53,17 @@ dotnet run --project tests/PicoBench.Tests/PicoBench.Tests.csproj -c Debug
 |------|-------|-------------|
 | `EmitterTests.cs` | 25 | 源生成器代碼發射：類結構、參數迭代、設置/清理鉤子、基準比較、`global::` 限定 |
 | `ModelsTests.cs` | 22 | `BenchmarkClassModel`、`BenchmarkMethodModel`、`ParamsPropertyModel` 相等性、哈希碼、邊界情況 |
+| `BenchmarkGeneratorDiagnosticsTests.cs` | 10+ | 無效簽名、重複 baseline、非法 `[Params]` 與列舉參數發射的端到端生成器診斷測試 |
+
+### 核心執行時覆蓋
+
+| 文件 | 測試數 | 描述 |
+|------|-------|-------------|
+| `BenchmarkTests.cs` | 40+ | 命令式 API、作用域執行、保留樣本、比較以及自動校準行為 |
+| `StatisticsCalculatorTests.cs` | 10+ | 包含標準誤、CPU 週期和邊界情況的統計計算 |
+| `ModelsTests.cs` | 40+ | 結果模型校驗、CPU 計數器元資料和波動輔助屬性 |
+
+格式化器測試現在也覆蓋更偏精度分析的輸出，例如標準誤、相對標準差，以及 Console、Markdown、HTML、CSV 中的 CPU 計數器說明。
 
 ### TestData/
 

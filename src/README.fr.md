@@ -16,10 +16,10 @@ La bibliothèque de benchmarking principale ciblant **netstandard2.0** sans dép
 | `BenchmarkRunner.cs` | Point d'entrée basé sur les attributs - `Run<T>()` |
 | `Attributes.cs` | Sept attributs : `[BenchmarkClass]`, `[Benchmark]`, `[Params]`, `[GlobalSetup]`, `[GlobalCleanup]`, `[IterationSetup]`, `[IterationCleanup]` |
 | `IBenchmarkClass.cs` | Interface implémentée par le générateur de source sur les classes décorées |
-| `BenchmarkConfig.cs` | Configuration avec les préconfigurations Quick / Default / Precise |
+| `BenchmarkConfig.cs` | Configuration avec les préconfigurations Quick / Default / Precise plus auto-calibrage optionnel |
 | `Runner.cs` | Moteur de chronométrage bas niveau avec comptage de cycles CPU spécifique à la plateforme |
 | `StatisticsCalculator.cs` | Calcul des percentiles et des statistiques |
-| `Models.cs` | Types de résultats : `BenchmarkResult`, `ComparisonResult`, `BenchmarkSuite`, `Statistics`, `TimingSample`, `GcInfo`, `EnvironmentInfo` |
+| `Models.cs` | Types de résultats incluant les champs de précision dans `Statistics` et les métadonnées de compteur CPU dans `EnvironmentInfo` |
 | `Formatters/` | Cinq formateurs : Console, Markdown, HTML, CSV, Summary |
 
 ### Empaquetage
@@ -41,7 +41,7 @@ dotnet add reference ../PicoBench.Generators/PicoBench.Generators.csproj
 Un **générateur de source incrémental** (`IIncrementalGenerator`) qui transforme les classes partial décorées avec `[BenchmarkClass]` en implémentations complètes de `IBenchmarkClass` au moment de la compilation.
 
 - **Cible** : netstandard2.0
-- **Dépendance** : Microsoft.CodeAnalysis.CSharp 4.3.1
+- **Dépendance** : Microsoft.CodeAnalysis.CSharp 5.0.0
 - **Sortie** : C# compatible AOT avec des appels qualifiés `global::` et sans réflexion
 
 ### Fichiers Clés
@@ -49,8 +49,11 @@ Un **générateur de source incrémental** (`IIncrementalGenerator`) qui transfo
 | Fichier | Objectif |
 |------|---------|
 | `BenchmarkGenerator.cs` | Point d'entrée du générateur utilisant `ForAttributeWithMetadataName` |
+| `DiagnosticDescriptors.cs` | Diagnostics centralisés du générateur pour les déclarations de benchmark invalides |
 | `Emitter.cs` | Émetteur de code C# - génère `RunBenchmarks()` avec itération de paramètres, crochets de configuration/nettoyage et logique de comparaison |
 | `Models.cs` | Modèles d'analyse Roslyn : `BenchmarkClassModel`, `BenchmarkMethodModel`, `ParamsPropertyModel` (tous `IEquatable<T>` pour le cache) |
+
+Le générateur valide désormais les erreurs courantes avant l'émission du code et signale des diagnostics pour les méthodes benchmark invalides, les méthodes de cycle de vie invalides, les baselines dupliquées, les cibles `[Params]` invalides et les valeurs de paramètres incompatibles.
 
 ### Code Généré
 

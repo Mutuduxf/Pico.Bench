@@ -102,3 +102,5 @@ dotnet run --project samples/CollectionBenchmarks -c Release
 ## 出力
 
 すべてのサンプルは、Markdown、HTML、CSV形式で出力フォルダーの下の`results/`サブディレクトリに結果を保存します。
+
+これらのレポートには、標準誤差、相対標準偏差、利用可能な場合の CPU カウンター注記など、精度重視のメタデータも含まれるようになりました。

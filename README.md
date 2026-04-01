@@ -17,11 +17,11 @@ A lightweight, zero-dependency benchmarking library for .NET with **two compleme
 - **High-Precision Timing** - Uses `Stopwatch` with nanosecond-level granularity
 - **GC Tracking** - Monitors Gen0/Gen1/Gen2 collection counts during benchmarks
 - **CPU Cycle Counting** - Hardware-level cycle counting (Windows via `QueryThreadCycleTime`, Linux via `perf_event`, macOS via `mach_absolute_time`)
-- **Statistical Analysis** - Mean, Median, P90, P95, P99, Min, Max, StdDev
+- **Statistical Analysis** - Mean, Median, P90, P95, P99, Min, Max, StdDev, StdErr, and relative variance
 - **Multiple Output Formats** - Console, Markdown, HTML, CSV and programmatic summary
 - **Parameterised Benchmarks** - `[Params]` attribute with automatic Cartesian product iteration
 - **Comparison Support** - Baseline vs candidate with speedup calculations
-- **Configurable** - Quick, Default, and Precise presets or fully custom configuration
+- **Configurable** - Quick, Default, and Precise presets, auto-calibration, or fully custom configuration
 - **netstandard2.0** - Compatible with .NET Framework 4.6.1+, .NET Core 2.0+, .NET 5+
 
 ## Installation
@@ -67,6 +67,8 @@ public partial class MyBenchmarks
 ```
 
 > The class **must** be `partial`. The source generator emits an `IBenchmarkClass` implementation at compile time - no reflection, fully AOT-safe.
+
+> Invalid attribute usage now produces generator diagnostics for common mistakes such as non-`partial` classes, duplicate baselines, invalid lifecycle signatures, and incompatible `[Params]` values.
 
 ---
 
@@ -146,6 +148,8 @@ Decorate a **partial** class with `[BenchmarkClass]` and its methods/properties 
 | `[IterationSetup]` | Method | Called before **each sample** (not timed). |
 | `[IterationCleanup]` | Method | Called after **each sample** (not timed). |
 
+`[Benchmark]` methods must be instance, non-generic, and parameterless. Lifecycle methods must be instance, non-generic, parameterless, and `void`. `[Params]` targets must be writable instance properties or non-readonly instance fields.
+
 ### Full Example
 
 ```csharp
@@ -200,11 +204,11 @@ var suite2 = BenchmarkRunner.Run(instance, BenchmarkConfig.Quick);
 
 ### Presets
 
-| Preset | Warmup | Samples | Iters/Sample | Use Case |
-|--------|--------|---------|--------------|----------|
-| `Quick` | 100 | 10 | 1,000 | Fast iteration / CI |
-| `Default` | 1,000 | 100 | 10,000 | General benchmarking |
-| `Precise` | 5,000 | 200 | 50,000 | Final measurements |
+| Preset | Warmup | Samples | Base Iters/Sample | Auto-Calibrate | Use Case |
+|--------|--------|---------|-------------------|----------------|----------|
+| `Quick` | 100 | 10 | 1,000 | Yes | Fast iteration / CI |
+| `Default` | 1,000 | 100 | 10,000 | No | General benchmarking |
+| `Precise` | 5,000 | 200 | 50,000 | Yes | Final measurements |
 
 ### Custom Configuration
 
@@ -214,11 +218,16 @@ var config = new BenchmarkConfig
     WarmupIterations    = 500,
     SampleCount         = 50,
     IterationsPerSample = 5000,
-    RetainSamples       = true   // Keep raw TimingSample data
+    RetainSamples       = true,  // Keep raw TimingSample data
+    AutoCalibrateIterations = true,
+    MinSampleTime       = TimeSpan.FromMilliseconds(0.5),
+    MaxAutoIterationsPerSample = 1_000_000
 };
 
 var result = Benchmark.Run("Test", action, config);
 ```
+
+When auto-calibration is enabled, PicoBench increases `IterationsPerSample` until a minimum sample-time budget is reached or `MaxAutoIterationsPerSample` is hit. This is especially useful for ultra-fast operations that would otherwise be dominated by timer noise.
 
 ---
 
@@ -237,6 +246,8 @@ var csv      = new CsvFormatter();         // CSV for data analysis
 // Static helper for comparison summaries:
 Console.WriteLine(SummaryFormatter.Format(suite.Comparisons));
 ```
+
+Console, Markdown, HTML, and CSV outputs now include precision-oriented metadata such as standard error, relative standard deviation, and CPU counter notes when available.
 
 ### Formatting Targets
 
@@ -288,10 +299,10 @@ File.WriteAllText(Path.Combine(dir, "results.csv"),  new CsvFormatter().Format(s
 | `BenchmarkResult` | Name, Statistics, Samples, IterationsPerSample, SampleCount, Tags, Category |
 | `ComparisonResult` | Baseline, Candidate, Speedup, IsFaster, ImprovementPercent |
 | `BenchmarkSuite` | Name, Description, Results, Comparisons, Environment, Duration |
-| `Statistics` | Avg, P50, P90, P95, P99, Min, Max, StdDev, CpuCyclesPerOp, GcInfo |
+| `Statistics` | Avg, P50, P90, P95, P99, Min, Max, StdDev, StandardError, RelativeStdDevPercent, CpuCyclesPerOp, GcInfo |
 | `TimingSample` | ElapsedNanoseconds, ElapsedMilliseconds, ElapsedTicks, CpuCycles, GcInfo |
 | `GcInfo` | Gen0, Gen1, Gen2, Total, IsZero |
-| `EnvironmentInfo` | Os, Architecture, RuntimeVersion, ProcessorCount, Configuration |
+| `EnvironmentInfo` | Os, Architecture, RuntimeVersion, ProcessorCount, Configuration, CPU counter kind / availability |
 
 ---
 
@@ -332,6 +343,8 @@ src/
 | GC tracking (Gen0/1/2) | Yes | Yes | Yes |
 | CPU cycle counting | `QueryThreadCycleTime` | `perf_event_open` | `mach_absolute_time` |
 | Process priority boost | Yes | Yes | Yes |
+
+On macOS the exported CPU counter is a high-resolution monotonic proxy rather than architectural cycle counts. `EnvironmentInfo` and formatter output expose this distinction explicitly.
 
 ---
 

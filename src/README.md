@@ -16,10 +16,10 @@ The main benchmarking library targeting **netstandard2.0** with zero external de
 | `BenchmarkRunner.cs` | Attribute-based entry point - `Run<T>()` |
 | `Attributes.cs` | Seven attributes: `[BenchmarkClass]`, `[Benchmark]`, `[Params]`, `[GlobalSetup]`, `[GlobalCleanup]`, `[IterationSetup]`, `[IterationCleanup]` |
 | `IBenchmarkClass.cs` | Interface implemented by the source generator on decorated classes |
-| `BenchmarkConfig.cs` | Configuration with Quick / Default / Precise presets |
+| `BenchmarkConfig.cs` | Configuration with Quick / Default / Precise presets plus optional auto-calibration |
 | `Runner.cs` | Low-level timing engine with platform-specific CPU cycle counting |
 | `StatisticsCalculator.cs` | Percentile and statistics computation |
-| `Models.cs` | Result types: `BenchmarkResult`, `ComparisonResult`, `BenchmarkSuite`, `Statistics`, `TimingSample`, `GcInfo`, `EnvironmentInfo` |
+| `Models.cs` | Result types including `Statistics` precision fields and CPU counter metadata in `EnvironmentInfo` |
 | `Formatters/` | Five formatters: Console, Markdown, HTML, CSV, Summary |
 
 ### Packaging
@@ -41,7 +41,7 @@ dotnet add reference ../PicoBench.Generators/PicoBench.Generators.csproj
 An **incremental source generator** (`IIncrementalGenerator`) that turns `[BenchmarkClass]`-decorated partial classes into full `IBenchmarkClass` implementations at compile time.
 
 - **Target**: netstandard2.0
-- **Dependency**: Microsoft.CodeAnalysis.CSharp 4.3.1
+- **Dependency**: Microsoft.CodeAnalysis.CSharp 5.0.0
 - **Output**: AOT-compatible C# with `global::` qualified calls and no reflection
 
 ### Key Files
@@ -49,8 +49,11 @@ An **incremental source generator** (`IIncrementalGenerator`) that turns `[Bench
 | File | Purpose |
 |------|---------|
 | `BenchmarkGenerator.cs` | Generator entry point using `ForAttributeWithMetadataName` |
+| `DiagnosticDescriptors.cs` | Centralised generator diagnostics for invalid benchmark declarations |
 | `Emitter.cs` | C# code emitter - generates `RunBenchmarks()` with parameter iteration, setup/teardown hooks, and comparison logic |
 | `Models.cs` | Roslyn analysis models: `BenchmarkClassModel`, `BenchmarkMethodModel`, `ParamsPropertyModel` (all `IEquatable<T>` for caching) |
+
+The generator now validates common mistakes before code emission and reports diagnostics for invalid benchmark methods, lifecycle methods, duplicate baselines, invalid `[Params]` targets, and incompatible parameter values.
 
 ### Generated Code
 

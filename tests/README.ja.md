@@ -4,7 +4,7 @@
 
 [TUnit](https://github.com/thomhurst/TUnit) テストフレームワークを使用した **PicoBench** の単体テストです。
 
-**合計：313テスト**
+**合計：454テスト**
 
 ## 実行
 
@@ -53,6 +53,17 @@ dotnet run --project tests/PicoBench.Tests/PicoBench.Tests.csproj -c Debug
 |------|-------|-------------|
 | `EmitterTests.cs` | 25 | ソースジェネレーターコード生成：クラス構造、パラメータ反復、セットアップ/ティアダウンフック、ベースライン比較、`global::`修飾 |
 | `ModelsTests.cs` | 22 | `BenchmarkClassModel`、`BenchmarkMethodModel`、`ParamsPropertyModel`の等価性、ハッシュコード、エッジケース |
+| `BenchmarkGeneratorDiagnosticsTests.cs` | 10+ | 無効なシグネチャ、重複 baseline、無効な `[Params]`、enum パラメーター出力に対するエンドツーエンドのジェネレーター診断 |
+
+### コアランタイムのカバレッジ
+
+| ファイル | テスト数 | 説明 |
+|------|-------|-------------|
+| `BenchmarkTests.cs` | 40+ | 命令型 API、scoped 実行、サンプル保持、比較、自動キャリブレーションの動作 |
+| `StatisticsCalculatorTests.cs` | 10+ | 標準誤差、CPU サイクル、境界ケースを含む統計計算 |
+| `ModelsTests.cs` | 40+ | 結果モデルの検証、CPU カウンターメタデータ、分散ヘルパー |
+
+フォーマッターテストでは、Console、Markdown、HTML、CSV における標準誤差、相対標準偏差、CPU カウンターノートなどの精度重視の出力もカバーするようになりました。
 
 ### TestData/
 

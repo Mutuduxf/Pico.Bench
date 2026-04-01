@@ -102,3 +102,5 @@ dotnet run --project samples/CollectionBenchmarks -c Release
 ## Output
 
 All samples save results to a `results/` subdirectory under the output folder in Markdown, HTML, and CSV formats.
+
+Those reports now include precision-focused metadata such as standard error, relative standard deviation, and CPU counter notes when available.

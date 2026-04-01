@@ -13,11 +13,11 @@ Eine leichte, abhängigkeitsfreie Benchmarking-Bibliothek für .NET mit **zwei k
 - **Hochpräzises Timing** - Verwendet `Stopwatch` mit Nanosekunden-Granularität
 - **GC-Tracking** - Überwacht Gen0/Gen1/Gen2-Sammlungszählungen während Benchmarks
 - **CPU-Zykluszählung** - Hardware-Level-Zykluszählung (Windows über `QueryThreadCycleTime`, Linux über `perf_event`, macOS über `mach_absolute_time`)
-- **Statistische Analyse** - Mittelwert, Median, P90, P95, P99, Minimum, Maximum, Standardabweichung
+- **Statistische Analyse** - Mittelwert, Median, P90, P95, P99, Minimum, Maximum, Standardabweichung, Standardfehler und relative Varianz
 - **Mehrere Ausgabeformate** - Konsole, Markdown, HTML, CSV und programmatische Zusammenfassung
 - **Parametrisierte Benchmarks** - `[Params]`-Attribut mit automatischer kartesischer Produktiteration
 - **Vergleichsunterstützung** - Baseline vs Kandidat mit Beschleunigungsberechnungen
-- **Konfigurierbar** - Quick-, Default- und Precise-Voreinstellungen oder vollständig benutzerdefinierte Konfiguration
+- **Konfigurierbar** - Quick-, Default- und Precise-Voreinstellungen, Auto-Kalibrierung oder vollständig benutzerdefinierte Konfiguration
 - **netstandard2.0** - Kompatibel mit .NET Framework 4.6.1+, .NET Core 2.0+, .NET 5+
 
 ## Installation
@@ -63,6 +63,8 @@ public partial class MyBenchmarks
 ```
 
 > Die Klasse **muss** `partial` sein. Der Quellgenerator erzeugt zur Kompilierzeit eine `IBenchmarkClass`-Implementierung - ohne Reflection, vollständig AOT-sicher.
+
+> Ungültige Attributverwendung erzeugt jetzt Generator-Diagnosen für häufige Fehler wie nicht-`partial` Klassen, doppelte Baselines, ungültige Lifecycle-Signaturen und inkompatible `[Params]`-Werte.
 
 ---
 
@@ -142,6 +144,8 @@ Dekorieren Sie eine **partial**-Klasse mit `[BenchmarkClass]` und ihre Methoden/
 | `[IterationSetup]` | Methode | Wird vor **jedem Sample** aufgerufen (nicht gemessen). |
 | `[IterationCleanup]` | Methode | Wird nach **jedem Sample** aufgerufen (nicht gemessen). |
 
+`[Benchmark]`-Methoden müssen Instanzmethoden, nicht generisch und parameterlos sein. Lifecycle-Methoden müssen Instanzmethoden, nicht generisch, parameterlos und `void` sein. `[Params]`-Ziele müssen schreibbare Instanz-Eigenschaften oder nicht-readonly Instanz-Felder sein.
+
 ### Vollständiges Beispiel
 
 ```csharp
@@ -196,11 +200,11 @@ var suite2 = BenchmarkRunner.Run(instance, BenchmarkConfig.Quick);
 
 ### Voreinstellungen
 
-| Voreinstellung | Aufwärmiterationen | Samples | Iterationen/Sample | Anwendungsfall |
-|--------|--------|---------|--------------|----------|
-| `Quick` | 100 | 10 | 1,000 | Schnelle Iteration / CI |
-| `Default` | 1,000 | 100 | 10,000 | Allgemeines Benchmarking |
-| `Precise` | 5,000 | 200 | 50,000 | Finale Messungen |
+| Voreinstellung | Aufwärmiterationen | Samples | Basis Iterationen/Sample | Auto-Kalibrierung | Anwendungsfall |
+|--------|--------|---------|--------------------------|-------------------|----------|
+| `Quick` | 100 | 10 | 1,000 | Ja | Schnelle Iteration / CI |
+| `Default` | 1,000 | 100 | 10,000 | Nein | Allgemeines Benchmarking |
+| `Precise` | 5,000 | 200 | 50,000 | Ja | Finale Messungen |
 
 ### Benutzerdefinierte Konfiguration
 
@@ -210,11 +214,16 @@ var config = new BenchmarkConfig
     WarmupIterations    = 500,
     SampleCount         = 50,
     IterationsPerSample = 5000,
-    RetainSamples       = true   // Rohdaten von TimingSample behalten
+    RetainSamples       = true,  // Rohdaten von TimingSample behalten
+    AutoCalibrateIterations = true,
+    MinSampleTime       = TimeSpan.FromMilliseconds(0.5),
+    MaxAutoIterationsPerSample = 1_000_000
 };
 
 var result = Benchmark.Run("Test", action, config);
 ```
+
+Wenn die Auto-Kalibrierung aktiviert ist, erhöht PicoBench `IterationsPerSample`, bis ein minimales Zeitbudget pro Sample erreicht ist oder `MaxAutoIterationsPerSample` erreicht wird. Das ist besonders hilfreich bei extrem schnellen Operationen, die sonst vom Timerrauschen dominiert werden.
 
 ---
 
@@ -233,6 +242,8 @@ var csv      = new CsvFormatter();         // CSV für Datenanalyse
 // Statische Hilfsfunktion für Vergleichszusammenfassungen:
 Console.WriteLine(SummaryFormatter.Format(suite.Comparisons));
 ```
+
+Console-, Markdown-, HTML- und CSV-Ausgaben enthalten jetzt präzisionsorientierte Metadaten wie Standardfehler, relative Standardabweichung und Hinweise zum CPU-Zähler, sofern verfügbar.
 
 ### Formatierungsziele
 
@@ -284,10 +295,10 @@ File.WriteAllText(Path.Combine(dir, "results.csv"),  new CsvFormatter().Format(s
 | `BenchmarkResult` | Name, Statistik, Samples, IterationenProSample, SampleAnzahl, Tags, Kategorie |
 | `ComparisonResult` | Baseline, Kandidat, Beschleunigung, IstSchneller, VerbesserungsProzent |
 | `BenchmarkSuite` | Name, Beschreibung, Ergebnisse, Vergleiche, Umgebung, Dauer |
-| `Statistics` | Durchschnitt, P50, P90, P95, P99, Minimum, Maximum, Standardabweichung, CpuZyklenProOp, GcInfo |
+| `Statistics` | Durchschnitt, P50, P90, P95, P99, Minimum, Maximum, Standardabweichung, StandardError, RelativeStdDevPercent, CpuZyklenProOp, GcInfo |
 | `TimingSample` | VerstricheneNanosekunden, VerstricheneMillisekunden, VerstricheneTicks, CpuZyklen, GcInfo |
 | `GcInfo` | Gen0, Gen1, Gen2, Gesamt, IstNull |
-| `EnvironmentInfo` | Betriebssystem, Architektur, Laufzeitversion, Prozessoranzahl, Konfiguration |
+| `EnvironmentInfo` | Betriebssystem, Architektur, Laufzeitversion, Prozessoranzahl, Konfiguration, CPU-Zählerart/-verfügbarkeit |
 
 ---
 
@@ -328,6 +339,8 @@ src/
 | GC-Tracking (Gen0/1/2) | Ja | Ja | Ja |
 | CPU-Zykluszählung | `QueryThreadCycleTime` | `perf_event_open` | `mach_absolute_time` |
 | Prozessprioritätserhöhung | Ja | Ja | Ja |
+
+Unter macOS ist der exportierte CPU-Zähler ein hochauflösender monotonic Proxy und keine architektonische Zykluszahl. `EnvironmentInfo` und die Formatter-Ausgabe machen diesen Unterschied explizit sichtbar.
 
 ---
 

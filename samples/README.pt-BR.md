@@ -102,3 +102,5 @@ dotnet run --project samples/CollectionBenchmarks -c Release
 ## Saída
 
 Todos os exemplos salvam resultados em um subdiretório `results/` sob a pasta de saída nos formatos Markdown, HTML e CSV.
+
+Esses relatórios agora também incluem metadados voltados à precisão, como erro padrão, desvio padrão relativo e observações sobre o contador de CPU quando disponíveis.
