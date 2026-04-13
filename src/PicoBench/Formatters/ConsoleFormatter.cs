@@ -281,20 +281,17 @@ public sealed class ConsoleFormatter(FormatterOptions? options = null) : Formatt
 
     #region Comparisons Table
 
-    private sealed class ComparisonRow
+    private sealed class ComparisonRow(
+        string name,
+        string provider,
+        BenchmarkResult result,
+        string speedup
+    )
     {
-        public string Name { get; }
-        public string Provider { get; }
-        public BenchmarkResult Result { get; }
-        public string Speedup { get; }
-
-        public ComparisonRow(string name, string provider, BenchmarkResult result, string speedup)
-        {
-            Name = name;
-            Provider = provider;
-            Result = result;
-            Speedup = speedup;
-        }
+        public string Name { get; } = name;
+        public string Provider { get; } = provider;
+        public BenchmarkResult Result { get; } = result;
+        public string Speedup { get; } = speedup;
     }
 
     private void AppendComparisonsTable(StringBuilder sb, List<ComparisonResult> comparisons)
@@ -384,7 +381,13 @@ public sealed class ConsoleFormatter(FormatterOptions? options = null) : Formatt
                 "CPU".Length,
                 rows.Max(r => $"{r.Result.Statistics.CpuCyclesPerOp:F0}".Length)
             );
-            columns.Add(new("CPU", cpuWidth, r => $"{r.Result.Statistics.CpuCyclesPerOp:F0}"));
+            columns.Add(
+                new TableColumn<ComparisonRow>(
+                    "CPU",
+                    cpuWidth,
+                    r => $"{r.Result.Statistics.CpuCyclesPerOp:F0}"
+                )
+            );
         }
 
         if (Options.IncludeGcInfo)
@@ -393,7 +396,13 @@ public sealed class ConsoleFormatter(FormatterOptions? options = null) : Formatt
                 "GC".Length,
                 rows.Max(r => FormatGcInfo(r.Result.Statistics.GcInfo).Length)
             );
-            columns.Add(new("GC", gcWidth, r => FormatGcInfo(r.Result.Statistics.GcInfo)));
+            columns.Add(
+                new TableColumn<ComparisonRow>(
+                    "GC",
+                    gcWidth,
+                    r => FormatGcInfo(r.Result.Statistics.GcInfo)
+                )
+            );
         }
 
         return columns;
@@ -432,25 +441,17 @@ public sealed class ConsoleFormatter(FormatterOptions? options = null) : Formatt
 
     #region Table Builder Utilities
 
-    private sealed class TableColumn<T>
+    private sealed class TableColumn<T>(
+        string header,
+        int width,
+        Func<T, string> getValue,
+        bool leftAlign = false
+    )
     {
-        public string Header { get; }
-        public int Width { get; set; }
-        public Func<T, string> GetValue { get; }
-        public bool LeftAlign { get; }
-
-        public TableColumn(
-            string header,
-            int width,
-            Func<T, string> getValue,
-            bool leftAlign = false
-        )
-        {
-            Header = header;
-            Width = width;
-            GetValue = getValue;
-            LeftAlign = leftAlign;
-        }
+        public string Header { get; } = header;
+        public int Width { get; set; } = width;
+        public Func<T, string> GetValue { get; } = getValue;
+        public bool LeftAlign { get; } = leftAlign;
     }
 
     private static void AppendTable<T>(

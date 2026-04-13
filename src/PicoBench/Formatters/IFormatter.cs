@@ -165,7 +165,7 @@ public abstract class FormatterBase(FormatterOptions? options = null) : IFormatt
     /// Format a single result. Default delegates to the collection overload.
     /// Override for custom single-item formatting (e.g., <see cref="ConsoleFormatter"/>).
     /// </summary>
-    protected virtual string FormatCore(BenchmarkResult result) => FormatCore(new[] { result });
+    protected virtual string FormatCore(BenchmarkResult result) => FormatCore([result]);
 
     /// <summary>
     /// Format a sequence of benchmark results.
@@ -176,8 +176,7 @@ public abstract class FormatterBase(FormatterOptions? options = null) : IFormatt
     /// Format a single comparison. Default delegates to the collection overload.
     /// Override for custom single-item formatting.
     /// </summary>
-    protected virtual string FormatCore(ComparisonResult comparison) =>
-        FormatCore(new[] { comparison });
+    protected virtual string FormatCore(ComparisonResult comparison) => FormatCore([comparison]);
 
     /// <summary>
     /// Format a sequence of comparison results.

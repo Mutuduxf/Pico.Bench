@@ -113,6 +113,7 @@ public sealed class CsvFormatter(FormatterOptions? options = null) : FormatterBa
         if (Options.IncludePercentiles)
         {
             columns.AddRange(
+
                 [
                     "P90_ns",
                     "P95_ns",
@@ -260,6 +261,7 @@ public sealed class CsvFormatter(FormatterOptions? options = null) : FormatterBa
         if (Options.IncludePercentiles)
         {
             values.AddRange(
+
                 [
                     FormatNumber(stats.P50),
                     FormatNumber(stats.P90),
@@ -389,7 +391,7 @@ public sealed class CsvFormatter(FormatterOptions? options = null) : FormatterBa
         if (File.Exists(filePath))
         {
             // Skip header line if file already exists
-            var lines = content.Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries);
+            var lines = content.Split(['\n'], StringSplitOptions.RemoveEmptyEntries);
             if (lines.Length > 1)
             {
                 File.AppendAllLines(filePath, lines.Skip(1));
