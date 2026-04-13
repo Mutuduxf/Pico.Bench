@@ -34,9 +34,8 @@ internal static class StatisticsCalculator
         var min = double.MaxValue;
         var max = double.MinValue;
 
-        for (int i = 0; i < perOpTimes.Length; i++)
+        foreach (var value in perOpTimes)
         {
-            var value = perOpTimes[i];
             sum += value;
             if (value < min)
                 min = value;
@@ -51,12 +50,7 @@ internal static class StatisticsCalculator
         var variance = 0.0;
         if (perOpTimes.Length > 1)
         {
-            var m2 = 0.0;
-            foreach (var t in perOpTimes)
-            {
-                var delta = t - avg;
-                m2 += delta * delta;
-            }
+            var m2 = perOpTimes.Select(t => t - avg).Select(delta => delta * delta).Sum();
             variance = m2 / (perOpTimes.Length - 1);
         }
         var stdDev = Math.Sqrt(Math.Max(0, variance));
@@ -64,11 +58,7 @@ internal static class StatisticsCalculator
         var relativeStdDevPercent = Math.Abs(avg) < 1e-12 ? 0.0 : (stdDev / Math.Abs(avg)) * 100.0;
 
         // Calculate CPU cycles average
-        var cpuCyclesSum = 0.0;
-        for (var i = 0; i < perOpCycles.Length; i++)
-        {
-            cpuCyclesSum += perOpCycles[i];
-        }
+        var cpuCyclesSum = perOpCycles.Sum();
         var cpuCyclesAvg = cpuCyclesSum / perOpCycles.Length;
 
         return new Statistics
