@@ -563,13 +563,20 @@ public class ModelsTests
 
     [Test]
     [Property("Category", "Models")]
-    public async Task EnvironmentInfo_IsNativeAot_ReflectedInToString()
+    public async Task EnvironmentInfo_ExecutionMode_ControlsToString()
     {
-        var env = new EnvironmentInfo { IsNativeAot = true };
-        await Assert.That(env.ToString()).Contains("AOT");
+        var nativeAot = new EnvironmentInfo { ExecutionMode = RuntimeExecutionMode.NativeAot };
+        await Assert.That(nativeAot.IsNativeAot).IsTrue();
+        await Assert.That(nativeAot.ToString()).Contains("Native AOT");
 
-        var envJit = new EnvironmentInfo { IsNativeAot = false };
-        await Assert.That(envJit.ToString()).Contains("JIT");
+        var jit = new EnvironmentInfo { ExecutionMode = RuntimeExecutionMode.Jit };
+        await Assert.That(jit.IsNativeAot).IsFalse();
+        await Assert.That(jit.ToString()).Contains("JIT");
+
+        var unknown = new EnvironmentInfo { ExecutionMode = RuntimeExecutionMode.Unknown };
+        await Assert.That(unknown.IsNativeAot).IsFalse();
+        await Assert.That(unknown.ToString()).Contains("Unknown");
+        await Assert.That(unknown.ToString()).DoesNotContain("JIT");
     }
 
     [Test]

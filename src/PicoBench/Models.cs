@@ -112,6 +112,21 @@ public enum CpuCycleMeasurementKind
 }
 
 /// <summary>
+/// Describes the execution mode of the benchmark process.
+/// </summary>
+public enum RuntimeExecutionMode
+{
+    /// <summary>The execution mode could not be determined reliably.</summary>
+    Unknown,
+
+    /// <summary>The benchmark process is running with a JIT runtime.</summary>
+    Jit,
+
+    /// <summary>The benchmark process is running as a Native AOT binary.</summary>
+    NativeAot
+}
+
+/// <summary>
 /// Complete benchmark result for a single test case.
 /// </summary>
 public sealed class BenchmarkResult
@@ -303,8 +318,17 @@ public sealed class EnvironmentInfo
     /// <summary>Number of logical processors.</summary>
     public int ProcessorCount { get; init; } = Environment.ProcessorCount;
 
-    /// <summary>Whether running with Native AOT.</summary>
-    public bool IsNativeAot { get; init; } = false; // Native AOT detection not available in netstandard2.0
+    /// <summary>
+    /// Describes the execution mode of the benchmark process.
+    /// Defaults to <see cref="RuntimeExecutionMode.Unknown"/> unless the caller sets it explicitly.
+    /// </summary>
+    public RuntimeExecutionMode ExecutionMode { get; init; } = RuntimeExecutionMode.Unknown;
+
+    /// <summary>
+    /// Whether the benchmark process is running with Native AOT.
+    /// This compatibility property only returns true for a positively identified Native AOT process.
+    /// </summary>
+    public bool IsNativeAot => ExecutionMode == RuntimeExecutionMode.NativeAot;
 
     /// <summary>Build configuration (Debug/Release).</summary>
     public string Configuration { get; init; } =
@@ -329,7 +353,17 @@ public sealed class EnvironmentInfo
 
     /// <inheritdoc />
     public override string ToString() =>
-        $"{RuntimeVersion} | {Os} | {Architecture} | {(IsNativeAot ? "AOT" : "JIT")} | {Configuration} | Cycles: {DescribeCpuCycleMeasurement(CpuCycleMeasurement)}";
+        $"{RuntimeVersion} | {Os} | {Architecture} | {DescribeExecutionMode(ExecutionMode)} | {Configuration} | Cycles: {DescribeCpuCycleMeasurement(CpuCycleMeasurement)}";
+
+    internal static string DescribeExecutionMode(RuntimeExecutionMode mode)
+    {
+        return mode switch
+        {
+            RuntimeExecutionMode.Jit => "JIT",
+            RuntimeExecutionMode.NativeAot => "Native AOT",
+            _ => "Unknown"
+        };
+    }
 
     internal static string DescribeCpuCycleMeasurement(CpuCycleMeasurementKind kind)
     {
