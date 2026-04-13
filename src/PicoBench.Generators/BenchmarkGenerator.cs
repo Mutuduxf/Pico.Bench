@@ -1,9 +1,5 @@
 namespace PicoBench.Generators;
 
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-
 /// <summary>
 /// Incremental source generator that discovers [BenchmarkClass]-attributed types
 /// and generates AOT-compatible <c>IBenchmarkClass</c> implementations.

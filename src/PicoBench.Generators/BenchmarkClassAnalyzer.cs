@@ -1,10 +1,5 @@
 namespace PicoBench.Generators;
 
-using System.Threading;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-
 internal static class BenchmarkClassAnalyzer
 {
     internal const string BenchmarkClassAttributeName = "PicoBench.BenchmarkClassAttribute";
@@ -24,7 +19,7 @@ internal static class BenchmarkClassAnalyzer
         var diagnostics = new List<Diagnostic>();
 
         if (ctx.TargetSymbol is not INamedTypeSymbol typeSymbol)
-            return new GeneratorAnalysisResult(null, diagnostics.ToImmutableArray());
+            return new GeneratorAnalysisResult(null, [..diagnostics]);
 
         ct.ThrowIfCancellationRequested();
 
@@ -54,13 +49,10 @@ internal static class BenchmarkClassAnalyzer
         };
 
         string? description = null;
-        foreach (var attr in ctx.Attributes)
+        foreach (var named in ctx.Attributes.SelectMany(attr => attr.NamedArguments))
         {
-            foreach (var named in attr.NamedArguments)
-            {
-                if (named.Key == "Description" && named.Value.Value is string desc)
-                    description = desc;
-            }
+            if (named is { Key: "Description", Value.Value: string desc })
+                description = desc;
         }
 
         string? globalSetup = null;
@@ -131,7 +123,7 @@ internal static class BenchmarkClassAnalyzer
         }
 
         if (diagnostics.Any(static d => d.Severity == DiagnosticSeverity.Error))
-            return new GeneratorAnalysisResult(null, diagnostics.ToImmutableArray());
+            return new GeneratorAnalysisResult(null, [..diagnostics]);
 
         return new GeneratorAnalysisResult(
             new BenchmarkClassModel
@@ -147,7 +139,7 @@ internal static class BenchmarkClassAnalyzer
                 Methods = methods.ToImmutable(),
                 ParamsProperties = paramsProps.ToImmutable()
             },
-            diagnostics.ToImmutableArray()
+            [..diagnostics]
         );
     }
 
@@ -171,7 +163,14 @@ internal static class BenchmarkClassAnalyzer
             {
                 case BenchmarkAttributeName:
                     hasBenchmarkDeclarations = true;
-                    RegisterBenchmarkMethod(method, attr, diagnostics, ref baselineMethod, methods, ct);
+                    RegisterBenchmarkMethod(
+                        method,
+                        attr,
+                        diagnostics,
+                        ref baselineMethod,
+                        methods,
+                        ct
+                    );
                     break;
                 case GlobalSetupAttributeName:
                     RegisterLifecycleMethod(
@@ -253,19 +252,20 @@ internal static class BenchmarkClassAnalyzer
             }
         }
 
-        if (isBaseline && baselineMethod is not null)
+        switch (isBaseline)
         {
-            diagnostics.Add(
-                Diagnostic.Create(
-                    DiagnosticDescriptors.DuplicateBaseline,
-                    GetAttributeLocation(attr, ct)
-                )
-            );
-            return;
+            case true when baselineMethod is not null:
+                diagnostics.Add(
+                    Diagnostic.Create(
+                        DiagnosticDescriptors.DuplicateBaseline,
+                        GetAttributeLocation(attr, ct)
+                    )
+                );
+                return;
+            case true:
+                baselineMethod = method.Name;
+                break;
         }
-
-        if (isBaseline)
-            baselineMethod = method.Name;
 
         methods.Add(
             new BenchmarkMethodModel
@@ -310,8 +310,12 @@ internal static class BenchmarkClassAnalyzer
     {
         foreach (var syntaxRef in typeSymbol.DeclaringSyntaxReferences)
         {
-            if (syntaxRef.GetSyntax() is ClassDeclarationSyntax classDecl
-                && classDecl.Modifiers.Any(static modifier => modifier.IsKind(SyntaxKind.PartialKeyword)))
+            if (
+                syntaxRef.GetSyntax() is ClassDeclarationSyntax classDecl
+                && classDecl
+                    .Modifiers
+                    .Any(static modifier => modifier.IsKind(SyntaxKind.PartialKeyword))
+            )
             {
                 return true;
             }
@@ -322,15 +326,13 @@ internal static class BenchmarkClassAnalyzer
 
     private static bool IsValidBenchmarkMethod(IMethodSymbol method)
     {
-        return !method.IsStatic && !method.IsGenericMethod && method.Parameters.Length == 0;
+        return method is { IsStatic: false, IsGenericMethod: false, Parameters.Length: 0 };
     }
 
     private static bool IsValidLifecycleMethod(IMethodSymbol method)
     {
-        return !method.IsStatic
-            && !method.IsGenericMethod
-            && method.Parameters.Length == 0
-            && method.ReturnsVoid;
+        return method
+            is { IsStatic: false, IsGenericMethod: false, Parameters.Length: 0, ReturnsVoid: true };
     }
 
     private static void RegisterLifecycleMethod(
@@ -375,7 +377,9 @@ internal static class BenchmarkClassAnalyzer
         string fullyQualifiedName
     )
     {
-        return attrs.FirstOrDefault(attr => attr.AttributeClass?.ToDisplayString() == fullyQualifiedName);
+        return attrs.FirstOrDefault(
+            attr => attr.AttributeClass?.ToDisplayString() == fullyQualifiedName
+        );
     }
 
     private static ParamsPropertyModel? BuildParamsModel(
@@ -455,10 +459,9 @@ internal static class BenchmarkClassAnalyzer
     {
         return memberSymbol switch
         {
-            IPropertySymbol property => !property.IsStatic
-                && property.SetMethod is not null
-                && !property.SetMethod.IsInitOnly,
-            IFieldSymbol field => !field.IsStatic && !field.IsReadOnly && !field.IsConst,
+            IPropertySymbol property
+                => property is { IsStatic: false, SetMethod.IsInitOnly: false },
+            IFieldSymbol field => field is { IsStatic: false, IsReadOnly: false, IsConst: false },
             _ => false
         };
     }
@@ -470,7 +473,8 @@ internal static class BenchmarkClassAnalyzer
     )
     {
         if (constant.IsNull)
-            return memberType.IsReferenceType || memberType.NullableAnnotation == NullableAnnotation.Annotated;
+            return memberType.IsReferenceType
+                || memberType.NullableAnnotation == NullableAnnotation.Annotated;
 
         if (constant.Type is null)
             return false;
@@ -491,20 +495,14 @@ internal static class BenchmarkClassAnalyzer
     }
 }
 
-internal sealed class GeneratorAnalysisResult
+internal sealed class GeneratorAnalysisResult(
+    BenchmarkClassModel? model,
+    ImmutableArray<Diagnostic> diagnostics
+)
 {
-    public GeneratorAnalysisResult(
-        BenchmarkClassModel? model,
-        ImmutableArray<Diagnostic> diagnostics
-    )
-    {
-        Model = model;
-        Diagnostics = diagnostics;
-    }
+    public BenchmarkClassModel? Model { get; } = model;
 
-    public BenchmarkClassModel? Model { get; }
-
-    public ImmutableArray<Diagnostic> Diagnostics { get; }
+    public ImmutableArray<Diagnostic> Diagnostics { get; } = diagnostics;
 
     public bool HasErrors => Diagnostics.Any(static d => d.Severity == DiagnosticSeverity.Error);
 }

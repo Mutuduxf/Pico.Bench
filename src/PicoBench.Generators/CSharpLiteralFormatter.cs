@@ -1,7 +1,5 @@
 namespace PicoBench.Generators;
 
-using Microsoft.CodeAnalysis;
-
 internal static class CSharpLiteralFormatter
 {
     internal static string FormatConstant(TypedConstant constant, ITypeSymbol? targetType)
@@ -9,7 +7,7 @@ internal static class CSharpLiteralFormatter
         if (constant.IsNull)
             return "null";
 
-        if (targetType is INamedTypeSymbol enumType && enumType.TypeKind == TypeKind.Enum)
+        if (targetType is INamedTypeSymbol { TypeKind: TypeKind.Enum } enumType)
             return FormatEnumLiteral(enumType, constant.Value);
 
         var value = constant.Value;
