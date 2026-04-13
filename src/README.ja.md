@@ -17,10 +17,12 @@
 | `Attributes.cs` | 7つの属性：`[BenchmarkClass]`、`[Benchmark]`、`[Params]`、`[GlobalSetup]`、`[GlobalCleanup]`、`[IterationSetup]`、`[IterationCleanup]` |
 | `IBenchmarkClass.cs` | ソースジェネレーターが装飾クラスで実装するインターフェース |
 | `BenchmarkConfig.cs` | Quick / Default / Preciseプリセットに加え、オプションの自動キャリブレーションを備えた設定 |
-| `Runner.cs` | プラットフォーム固有のCPUサイクルカウント付き低レベルタイミングエンジン |
+| `Runner.cs` | 低レベルのタイミングフローとサンプル生成 |
+| `Runner.Gc.cs` | GC ベースラインと差分追跡 |
+| `Runner.Cpu.cs` | プラットフォーム固有の CPU カウンター実装 |
 | `StatisticsCalculator.cs` | パーセンタイルと統計計算 |
 | `Models.cs` | `Statistics` の精度フィールドと `EnvironmentInfo` の CPU カウンターメタデータを含む結果タイプ |
-| `Formatters/` | 5つのフォーマッター：Console、Markdown、HTML、CSV、Summary |
+| `Formatters/` | 4 つの `IFormatter` 実装（Console、Markdown、HTML、CSV）と `SummaryFormatter` |
 
 ### パッケージング
 
@@ -49,6 +51,8 @@ dotnet add reference ../PicoBench.Generators/PicoBench.Generators.csproj
 | ファイル | 目的 |
 |------|---------|
 | `BenchmarkGenerator.cs` | `ForAttributeWithMetadataName`を使用するジェネレーターエントリーポイント |
+| `BenchmarkClassAnalyzer.cs` | コード生成前の Roslyn 解析と診断 |
+| `CSharpLiteralFormatter.cs` | 生成される `[Params]` 値用の C# リテラル整形 |
 | `DiagnosticDescriptors.cs` | 無効なベンチマーク宣言のための集約されたジェネレーター診断定義 |
 | `Emitter.cs` | C#コードエミッター - パラメータ反復、セットアップ/ティアダウンフック、比較ロジックを含む`RunBenchmarks()`を生成 |
 | `Models.cs` | Roslyn分析モデル：`BenchmarkClassModel`、`BenchmarkMethodModel`、`ParamsPropertyModel`（すべてキャッシュ用に`IEquatable<T>`実装） |

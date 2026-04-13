@@ -17,10 +17,12 @@ La bibliothèque de benchmarking principale ciblant **netstandard2.0** sans dép
 | `Attributes.cs` | Sept attributs : `[BenchmarkClass]`, `[Benchmark]`, `[Params]`, `[GlobalSetup]`, `[GlobalCleanup]`, `[IterationSetup]`, `[IterationCleanup]` |
 | `IBenchmarkClass.cs` | Interface implémentée par le générateur de source sur les classes décorées |
 | `BenchmarkConfig.cs` | Configuration avec les préconfigurations Quick / Default / Precise plus auto-calibrage optionnel |
-| `Runner.cs` | Moteur de chronométrage bas niveau avec comptage de cycles CPU spécifique à la plateforme |
+| `Runner.cs` | Flux de chronométrage bas niveau et création d'échantillons |
+| `Runner.Gc.cs` | Ligne de base GC et calcul des deltas |
+| `Runner.Cpu.cs` | Implémentation du compteur CPU spécifique à la plateforme |
 | `StatisticsCalculator.cs` | Calcul des percentiles et des statistiques |
 | `Models.cs` | Types de résultats incluant les champs de précision dans `Statistics` et les métadonnées de compteur CPU dans `EnvironmentInfo` |
-| `Formatters/` | Cinq formateurs : Console, Markdown, HTML, CSV, Summary |
+| `Formatters/` | Quatre implémentations de `IFormatter` (Console, Markdown, HTML, CSV) plus `SummaryFormatter` |
 
 ### Empaquetage
 
@@ -49,6 +51,8 @@ Un **générateur de source incrémental** (`IIncrementalGenerator`) qui transfo
 | Fichier | Objectif |
 |------|---------|
 | `BenchmarkGenerator.cs` | Point d'entrée du générateur utilisant `ForAttributeWithMetadataName` |
+| `BenchmarkClassAnalyzer.cs` | Analyse et diagnostics Roslyn avant l'émission du code |
+| `CSharpLiteralFormatter.cs` | Formate les littéraux C# pour les valeurs `[Params]` émises |
 | `DiagnosticDescriptors.cs` | Diagnostics centralisés du générateur pour les déclarations de benchmark invalides |
 | `Emitter.cs` | Émetteur de code C# - génère `RunBenchmarks()` avec itération de paramètres, crochets de configuration/nettoyage et logique de comparaison |
 | `Models.cs` | Modèles d'analyse Roslyn : `BenchmarkClassModel`, `BenchmarkMethodModel`, `ParamsPropertyModel` (tous `IEquatable<T>` pour le cache) |

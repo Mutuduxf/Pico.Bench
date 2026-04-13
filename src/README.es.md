@@ -17,10 +17,12 @@ La principal biblioteca de benchmarking con objetivo **netstandard2.0** y cero d
 | `Attributes.cs` | Siete atributos: `[BenchmarkClass]`, `[Benchmark]`, `[Params]`, `[GlobalSetup]`, `[GlobalCleanup]`, `[IterationSetup]`, `[IterationCleanup]` |
 | `IBenchmarkClass.cs` | Interfaz implementada por el generador de código fuente en clases decoradas |
 | `BenchmarkConfig.cs` | Configuración con preajustes Quick / Default / Precise más auto-calibración opcional |
-| `Runner.cs` | Motor de cronometría de bajo nivel con conteo de ciclos de CPU específico de plataforma |
+| `Runner.cs` | Flujo de temporización de bajo nivel y creación de muestras |
+| `Runner.Gc.cs` | Línea base y delta de GC |
+| `Runner.Cpu.cs` | Implementación del contador de CPU específica de la plataforma |
 | `StatisticsCalculator.cs` | Cálculo de percentiles y estadísticas |
 | `Models.cs` | Tipos de resultados incluyendo campos de precisión en `Statistics` y metadatos del contador de CPU en `EnvironmentInfo` |
-| `Formatters/` | Cinco formateadores: Console, Markdown, HTML, CSV, Summary |
+| `Formatters/` | Cuatro implementaciones de `IFormatter` (Console, Markdown, HTML, CSV) más `SummaryFormatter` |
 
 ### Empaquetado
 
@@ -49,6 +51,8 @@ Un **generador de código fuente incremental** (`IIncrementalGenerator`) que con
 | Archivo | Propósito |
 |------|---------|
 | `BenchmarkGenerator.cs` | Punto de entrada del generador usando `ForAttributeWithMetadataName` |
+| `BenchmarkClassAnalyzer.cs` | Análisis y diagnósticos de Roslyn antes de emitir código |
+| `CSharpLiteralFormatter.cs` | Formatea literales de C# para valores `[Params]` emitidos |
 | `DiagnosticDescriptors.cs` | Diagnósticos centralizados del generador para declaraciones de benchmark inválidas |
 | `Emitter.cs` | Emisor de código C# - genera `RunBenchmarks()` con iteración de parámetros, ganchos de configuración/limpieza y lógica de comparación |
 | `Models.cs` | Modelos de análisis Roslyn: `BenchmarkClassModel`, `BenchmarkMethodModel`, `ParamsPropertyModel` (todos `IEquatable<T>` para caché) |

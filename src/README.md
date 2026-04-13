@@ -17,10 +17,12 @@ The main benchmarking library targeting **netstandard2.0** with zero external de
 | `Attributes.cs` | Seven attributes: `[BenchmarkClass]`, `[Benchmark]`, `[Params]`, `[GlobalSetup]`, `[GlobalCleanup]`, `[IterationSetup]`, `[IterationCleanup]` |
 | `IBenchmarkClass.cs` | Interface implemented by the source generator on decorated classes |
 | `BenchmarkConfig.cs` | Configuration with Quick / Default / Precise presets plus optional auto-calibration |
-| `Runner.cs` | Low-level timing engine with platform-specific CPU cycle counting |
+| `Runner.cs` | Low-level timing flow and sample creation |
+| `Runner.Gc.cs` | GC baseline and delta tracking |
+| `Runner.Cpu.cs` | Platform-specific CPU counter implementation |
 | `StatisticsCalculator.cs` | Percentile and statistics computation |
 | `Models.cs` | Result types including `Statistics` precision fields and CPU counter metadata in `EnvironmentInfo` |
-| `Formatters/` | Five formatters: Console, Markdown, HTML, CSV, Summary |
+| `Formatters/` | Four `IFormatter` implementations (Console, Markdown, HTML, CSV) plus `SummaryFormatter` |
 
 ### Packaging
 
@@ -49,6 +51,8 @@ An **incremental source generator** (`IIncrementalGenerator`) that turns `[Bench
 | File | Purpose |
 |------|---------|
 | `BenchmarkGenerator.cs` | Generator entry point using `ForAttributeWithMetadataName` |
+| `BenchmarkClassAnalyzer.cs` | Roslyn analysis and diagnostics before code emission |
+| `CSharpLiteralFormatter.cs` | Formats C# literals for emitted `[Params]` values |
 | `DiagnosticDescriptors.cs` | Centralised generator diagnostics for invalid benchmark declarations |
 | `Emitter.cs` | C# code emitter - generates `RunBenchmarks()` with parameter iteration, setup/teardown hooks, and comparison logic |
 | `Models.cs` | Roslyn analysis models: `BenchmarkClassModel`, `BenchmarkMethodModel`, `ParamsPropertyModel` (all `IEquatable<T>` for caching) |

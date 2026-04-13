@@ -17,10 +17,12 @@
 | `Attributes.cs` | 七个属性：`[BenchmarkClass]`、`[Benchmark]`、`[Params]`、`[GlobalSetup]`、`[GlobalCleanup]`、`[IterationSetup]`、`[IterationCleanup]` |
 | `IBenchmarkClass.cs` | 由源生成器在装饰类上实现的接口 |
 | `BenchmarkConfig.cs` | 包含 Quick / Default / Precise 预设以及可选自动校准的配置 |
-| `Runner.cs` | 底层计时引擎，支持平台特定的 CPU 周期计数 |
+| `Runner.cs` | 底层计时流程与样本构造 |
+| `Runner.Gc.cs` | GC 基线与增量跟踪 |
+| `Runner.Cpu.cs` | 平台相关 CPU 计数器实现 |
 | `StatisticsCalculator.cs` | 百分位数和统计计算 |
 | `Models.cs` | 结果类型，包括 `Statistics` 的精度字段以及 `EnvironmentInfo` 中的 CPU 计数器元数据 |
-| `Formatters/` | 五个格式化器：Console、Markdown、HTML、CSV、Summary |
+| `Formatters/` | 四个 `IFormatter` 实现（Console、Markdown、HTML、CSV）以及 `SummaryFormatter` |
 
 ### 打包
 
@@ -49,6 +51,8 @@ dotnet add reference ../PicoBench.Generators/PicoBench.Generators.csproj
 | 文件 | 用途 |
 |------|---------|
 | `BenchmarkGenerator.cs` | 生成器入口点，使用 `ForAttributeWithMetadataName` |
+| `BenchmarkClassAnalyzer.cs` | 代码发射前的 Roslyn 分析与诊断 |
+| `CSharpLiteralFormatter.cs` | 为生成的 `[Params]` 值格式化 C# 字面量 |
 | `DiagnosticDescriptors.cs` | 集中的生成器诊断定义，用于无效基准声明 |
 | `Emitter.cs` | C# 代码发射器 - 生成 `RunBenchmarks()`，包含参数迭代、设置/清理钩子和比较逻辑 |
 | `Models.cs` | Roslyn 分析模型：`BenchmarkClassModel`、`BenchmarkMethodModel`、`ParamsPropertyModel`（全部实现 `IEquatable<T>` 以支持缓存） |

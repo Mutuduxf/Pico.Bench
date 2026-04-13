@@ -17,10 +17,12 @@ Die Haupt-Benchmarking-Bibliothek mit Ziel **netstandard2.0** ohne externe Abhä
 | `Attributes.cs` | Sieben Attribute: `[BenchmarkClass]`, `[Benchmark]`, `[Params]`, `[GlobalSetup]`, `[GlobalCleanup]`, `[IterationSetup]`, `[IterationCleanup]` |
 | `IBenchmarkClass.cs` | Vom Quellgenerator auf dekorierte Klassen implementierte Schnittstelle |
 | `BenchmarkConfig.cs` | Konfiguration mit Quick / Default / Precise Voreinstellungen plus optionaler Auto-Kalibrierung |
-| `Runner.cs` | Low-Level-Timing-Engine mit plattformspezifischer CPU-Zykluszählung |
+| `Runner.cs` | Low-Level-Timing-Ablauf und Sample-Erzeugung |
+| `Runner.Gc.cs` | GC-Basislinie und Delta-Berechnung |
+| `Runner.Cpu.cs` | Plattformspezifische CPU-Zähler-Implementierung |
 | `StatisticsCalculator.cs` | Prozentil- und Statistikberechnung |
 | `Models.cs` | Ergebnistypen einschließlich Präzisionsfeldern in `Statistics` und CPU-Zähler-Metadaten in `EnvironmentInfo` |
-| `Formatters/` | Fünf Formatierer: Console, Markdown, HTML, CSV, Summary |
+| `Formatters/` | Vier `IFormatter`-Implementierungen (Console, Markdown, HTML, CSV) plus `SummaryFormatter` |
 
 ### Paketierung
 
@@ -49,6 +51,8 @@ Ein **inkrementeller Quellgenerator** (`IIncrementalGenerator`), der mit `[Bench
 | Datei | Zweck |
 |------|---------|
 | `BenchmarkGenerator.cs` | Generator-Einstiegspunkt mit `ForAttributeWithMetadataName` |
+| `BenchmarkClassAnalyzer.cs` | Roslyn-Analyse und Diagnostik vor der Code-Emission |
+| `CSharpLiteralFormatter.cs` | Formatiert C#-Literale für emittierte `[Params]`-Werte |
 | `DiagnosticDescriptors.cs` | Zentrale Generator-Diagnosen für ungültige Benchmark-Deklarationen |
 | `Emitter.cs` | C#-Code-Emitter – generiert `RunBenchmarks()` mit Parameteriteration, Setup/Teardown-Hooks und Vergleichslogik |
 | `Models.cs` | Roslyn-Analysemodelle: `BenchmarkClassModel`, `BenchmarkMethodModel`, `ParamsPropertyModel` (alle `IEquatable<T>` für Caching) |

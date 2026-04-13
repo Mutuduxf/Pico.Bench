@@ -17,10 +17,12 @@ A biblioteca principal de benchmarking com destino a **netstandard2.0** sem depe
 | `Attributes.cs` | Sete atributos: `[BenchmarkClass]`, `[Benchmark]`, `[Params]`, `[GlobalSetup]`, `[GlobalCleanup]`, `[IterationSetup]`, `[IterationCleanup]` |
 | `IBenchmarkClass.cs` | Interface implementada pelo gerador de código fonte em classes decoradas |
 | `BenchmarkConfig.cs` | Configuração com predefinições Quick / Default / Precise mais auto-calibração opcional |
-| `Runner.cs` | Motor de temporização de baixo nível com contagem de ciclos de CPU específica da plataforma |
+| `Runner.cs` | Fluxo de temporização de baixo nível e criação de amostras |
+| `Runner.Gc.cs` | Linha de base e delta de GC |
+| `Runner.Cpu.cs` | Implementação do contador de CPU específica da plataforma |
 | `StatisticsCalculator.cs` | Cálculo de percentis e estatísticas |
 | `Models.cs` | Tipos de resultado incluindo campos de precisão em `Statistics` e metadados do contador de CPU em `EnvironmentInfo` |
-| `Formatters/` | Cinco formatadores: Console, Markdown, HTML, CSV, Summary |
+| `Formatters/` | Quatro implementações de `IFormatter` (Console, Markdown, HTML, CSV) mais `SummaryFormatter` |
 
 ### Empacotamento
 
@@ -49,6 +51,8 @@ Um **gerador de código fonte incremental** (`IIncrementalGenerator`) que transf
 | Arquivo | Propósito |
 |------|---------|
 | `BenchmarkGenerator.cs` | Ponto de entrada do gerador usando `ForAttributeWithMetadataName` |
+| `BenchmarkClassAnalyzer.cs` | Análise e diagnósticos do Roslyn antes da emissão de código |
+| `CSharpLiteralFormatter.cs` | Formata literais C# para valores `[Params]` emitidos |
 | `DiagnosticDescriptors.cs` | Diagnósticos centralizados do gerador para declarações de benchmark inválidas |
 | `Emitter.cs` | Emissor de código C# - gera `RunBenchmarks()` com iteração de parâmetros, hooks de setup/teardown e lógica de comparação |
 | `Models.cs` | Modelos de análise Roslyn: `BenchmarkClassModel`, `BenchmarkMethodModel`, `ParamsPropertyModel` (todos `IEquatable<T>` para caching) |
